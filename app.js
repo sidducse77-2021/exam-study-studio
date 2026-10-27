@@ -43,7 +43,7 @@ const starter = {
       options: ["WPI", "CPI", "GDP deflator", "Index of Industrial Production"],
       answer: 1,
       explanation: "The Consumer Price Index (CPI) is the widely used index to track retail inflation in India.",
-      telugu: "భారతదేశంలో వినియోగదారుల ధర సూచిక (CPI) వాణిజ్య ధర పెరుగుదలను అంచనా వేయడానికి అతిపెద్దగా ఉపయోగించబడుతుంది.",
+      telugu: "భారతదేశంలో వినియోగదారుల ధర సూచిక (CPI) వాణిజ్య ధర పెరుగుదలను అంచనా వేస్తుంది.",
       additional: "CPI captures household consumption patterns.",
       source: "Indian Economy",
       tags: ["Inflation", "Economy"],
@@ -206,6 +206,7 @@ function refreshAll() {
   renderAlerts();
   renderTasks();
   renderBackupStatus();
+  renderDriveStatus();
 }
 
 function renderStats() {
@@ -389,7 +390,7 @@ function renderQuestionDetail(question, list) {
     <div class="result-box">
       <h4>Explanation</h4>
       ${question.explanation ? `<div class="explanation">${esc(question.explanation)}</div>` : "<div class=\"muted\">No explanation recorded.</div>"}
-      ${question.telugu ? `<div class="explanation telugu">${esc(question.telugu)}</div>` : ""}
+      ${question.telugu ? `<div class=\"explanation telugu\">${esc(question.telugu)}</div>` : ""}
       ${question.source ? `<div class=\"meta-row\"><strong>Source:</strong> ${esc(question.source)}</div>` : ""}
     </div>
   `;
@@ -566,11 +567,21 @@ function renderBackupStatus() {
   if (status) {
     status.textContent = "Local backup available. Keep a JSON export before making major changes.";
   }
+}
 
+function renderDriveStatus() {
   const driveStatus = document.getElementById("driveStatus");
-  if (driveStatus) {
+  if (!driveStatus) return;
+
+  const configured = !!(window.__GOOGLE_DRIVE_CONFIGURED__ || false);
+  if (configured) {
+    driveStatus.textContent = "Google Drive integration is ready for use with the configured OAuth credentials.";
+    driveStatus.classList.add("success");
+    driveStatus.classList.remove("warning");
+  } else {
     driveStatus.textContent = "Drive sync is not active. Google OAuth and redirect configuration are still required.";
     driveStatus.classList.add("warning");
+    driveStatus.classList.remove("success");
   }
 }
 
@@ -590,7 +601,7 @@ async function handleDocumentUpload(files) {
       } else if (name.toLowerCase().endsWith(".txt") || name.toLowerCase().endsWith(".md")) {
         text = await file.text();
       } else if (file.type.startsWith("image/")) {
-        text = "Image uploaded. OCR or AI multimodal processing requires a configured backend and is not active in this deployment.";
+        text = await extractImageWithGemini(file, status);
       } else {
         text = await file.text();
       }
@@ -659,6 +670,30 @@ async function extractDocx(file, status) {
   return result.value || "";
 }
 
+async function extractImageWithGemini(file, status) {
+  try {
+    if (status) {
+      status.textContent = `Preparing image OCR for ${file.name || "image"} using the configured backend...`;
+    }
+
+    const payload = await callGeminiAIForImage(file);
+    if (payload && typeof payload === "string" && payload.trim()) {
+      return payload.trim();
+    }
+
+    if (status) {
+      status.textContent = "Image conversion succeeded, but no readable text was returned. Paste the text manually or ensure the backend OCR workflow is configured.";
+    }
+    return "";
+  } catch (error) {
+    console.error("Image OCR failed", error);
+    if (status) {
+      status.textContent = `Image OCR failed: ${error.message || "Unknown image processing error"}`;
+    }
+    return "";
+  }
+}
+
 async function makeAiQuestionsFromText() {
   const text = document.getElementById("extractedText").value.trim();
   const batchSizeInput = document.getElementById("batchSize");
@@ -685,25 +720,27 @@ async function makeAiQuestionsFromText() {
 
   try {
     const prompt = `
-You are a bilingual exam-preparation assistant for UPSC, APPSC, SSC, RRB, CTET, DSC and other competitive exams.
-Use only the provided material as primary evidence.
-Create exactly ${batchSize} high-quality MCQs when the material supports them.
-Requirements:
-- English question and Telugu translation
-- Four options in English with Telugu translation where appropriate
-- Correct answer in zero-based JSON index
-- English explanation and Telugu explanation
-- exam, subject, topic, subtopic, difficulty, source reference and page if available
-- clearly state if a fact is not supported by the source
-- do not invent official PYQs or unverifiable facts
+You are a careful, bilingual exam-preparation assistant for UPSC, APPSC, SSC, RRB, CTET, DSC, and related competitive exams.
 
-Return valid JSON only in this structure:
+Use only the supplied material as primary evidence. Never invent facts, official sources, or government schemes. If a fact is not directly supported by the source text, say so clearly.
+
+Create exactly ${Math.max(1, Math.min(15, batchSize || 15))} high-quality MCQs when the source supports them.
+
+Requirements:
+- English question + Telugu translation
+- Four options only
+- Zero-based answer index
+- English explanation + Telugu explanation
+- exam, subject, topic, difficulty, source reference
+- additional prelims/mains relevance
+- no fabricated official PYQs or unverifiable claims
+
+Return valid JSON only in this format:
 {
   "mcqs": [
     {
       "subject": "",
       "topic": "",
-      "subtopic": "",
       "exam": "",
       "difficulty": "",
       "question_en": "",
@@ -752,32 +789,34 @@ ${text.slice(0, 22000)}
 
     const uniqueQuestions = [];
     const seen = new Set(data.mcqs.map((question) => fingerprint(question.question)));
-    for (const question of questions) {
-      const questionText = question.question_en || question.question_te || "";
+
+    for (const q of questions) {
+      const questionText = q.question_en || q.question_te || "";
       if (!questionText) continue;
+
       const normalized = fingerprint(questionText);
       if (seen.has(normalized)) continue;
       seen.add(normalized);
 
       uniqueQuestions.push({
         id: `ai-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        exam: question.exam || "UPSC",
-        subject: question.subject || "General Studies",
-        topic: question.topic || "Document study",
-        question: question.question_en || question.question_te || "Question",
-        question_te: question.question_te || "",
-        options: Array.isArray(question.options_en) && question.options_en.length === 4 ? question.options_en : ["Option A", "Option B", "Option C", "Option D"],
-        options_te: Array.isArray(question.options_te) && question.options_te.length === 4 ? question.options_te : ["వైదా A", "వైదా B", "వైదా C", "వైదా D"],
-        answer: Number.isInteger(question.answer) ? question.answer : 0,
-        explanation: question.explanation_en || "",
-        telugu: question.explanation_te || "",
-        additional: question.additional_info || "",
-        source: question.source_reference || "Uploaded document",
-        tags: [question.topic || "Document study", question.subject || "General Studies"],
+        exam: q.exam || "UPSC",
+        subject: q.subject || "General Studies",
+        topic: q.topic || "Document study",
+        question: q.question_en || q.question_te || "Question",
+        question_te: q.question_te || "",
+        options: Array.isArray(q.options_en) && q.options_en.length === 4 ? q.options_en : ["Option A", "Option B", "Option C", "Option D"],
+        options_te: Array.isArray(q.options_te) && q.options_te.length === 4 ? q.options_te : ["వైదా A", "వైదా B", "వైదా C", "వైదా D"],
+        answer: Number.isInteger(q.answer) ? q.answer : 0,
+        explanation: q.explanation_en || "",
+        telugu: q.explanation_te || "",
+        additional: q.additional_info || "",
+        source: q.source_reference || "Uploaded document",
+        tags: [q.topic || "Document study", q.subject || "General Studies"],
         bookmarked: false,
-        difficulty: question.difficulty || "Medium",
+        difficulty: q.difficulty || "Medium",
         attempted: false,
-        sourcePage: question.source_page || ""
+        sourcePage: q.source_page || ""
       });
     }
 
@@ -786,7 +825,8 @@ ${text.slice(0, 22000)}
       return;
     }
 
-    data.mcqs.push(...uniqueQuestions);
+    const allowedQuestions = uniqueQuestions.slice(0, Math.max(1, Math.min(15, batchSize || 15)));
+    data.mcqs.push(...allowedQuestions);
 
     if (Array.isArray(payload.terms)) {
       payload.terms.forEach((term) => {
@@ -808,7 +848,7 @@ ${text.slice(0, 22000)}
 
     saveData();
     go("mcqs");
-    alert(`Generated ${uniqueQuestions.length} new question(s) from the uploaded text.`);
+    alert(`Generated ${allowedQuestions.length} new question(s) from the uploaded text.`);
   } catch (error) {
     console.error(error);
     alert(`AI generation failed: ${error.message || "Unknown error"}`);
@@ -839,10 +879,139 @@ async function callGeminiAI(prompt) {
   return payload.result || "";
 }
 
+async function callGeminiAIForImage(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("model", "gemini-2.5-flash");
+  formData.append("kind", "ocr");
+
+  const response = await fetch("/api/generate", {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || "Image OCR request failed.");
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  return payload.result || "";
+}
+
 function addListenerIfExists(idName, eventName, handler) {
   const element = document.getElementById(idName);
   if (element) {
     element.addEventListener(eventName, handler);
+  }
+}
+
+async function fetchDriveConfig() {
+  try {
+    const response = await fetch("/api/drive-files", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    return !!payload.configured;
+  } catch (error) {
+    console.warn("Drive config probe failed", error);
+    return false;
+  }
+}
+
+async function initDriveUI() {
+  const connectBtn = document.getElementById("driveConnectBtn");
+  const refreshBtn = document.getElementById("driveRefreshBtn");
+  const driveStatus = document.getElementById("driveStatus");
+  const list = document.getElementById("driveFileList");
+
+  if (connectBtn) {
+    connectBtn.addEventListener("click", async () => {
+      const configured = await fetchDriveConfig();
+      if (!configured) {
+        alert("Google Drive OAuth is not configured on this deployment. Set the required environment variables and redirect URIs first.");
+        return;
+      }
+
+      window.location.href = "/api/drive-auth";
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", async () => {
+      const configured = await fetchDriveConfig();
+      if (!configured) {
+        alert("Google Drive is not configured on this deployment yet.");
+        return;
+      }
+
+      const response = await fetch("/api/drive-files");
+      if (!response.ok) {
+        if (list) {
+          list.innerHTML = "<div class=\"empty-state\">Drive files are unavailable right now.</div>";
+        }
+        return;
+      }
+
+      const payload = await response.json().catch(() => ({ files: [] }));
+      if (!Array.isArray(payload.files)) {
+        if (list) {
+          list.innerHTML = "<div class=\"empty-state\">No Drive files found.</div>";
+        }
+        return;
+      }
+
+      if (list) {
+        list.innerHTML = payload.files.slice(0, 10).map((file) => `
+          <div class="drive-item">
+            <strong>${esc(file.name || "Unnamed file")}</strong>
+            <small>${esc(file.mimeType || "Drive file")}</small>
+            <button class="secondary" data-drive-import="${esc(file.id)}">Import</button>
+          </div>
+        `).join("") || "<div class=\"empty-state\">No files available in Drive.</div>";
+      }
+
+      list?.querySelectorAll("[data-drive-import]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const fileId = button.dataset.driveImport;
+          const response = await fetch(`/api/drive-files?fileId=${encodeURIComponent(fileId)}`);
+          const payload = await response.json().catch(() => ({}));
+
+          if (!response.ok || !payload || !payload.text) {
+            alert("The selected file could not be imported.");
+            return;
+          }
+
+          document.getElementById("extractedText").value = payload.text || "";
+          document.getElementById("articleTitle").value = payload.name || "Imported Drive file";
+          go("documents");
+          alert("Drive document imported into the article workspace.");
+        });
+      });
+    });
+  }
+
+  const configured = await fetchDriveConfig();
+  if (!configured) {
+    if (driveStatus) {
+      driveStatus.textContent = "Drive sync is not active. Google OAuth and redirect configuration are still required.";
+      driveStatus.classList.add("warning");
+      driveStatus.classList.remove("success");
+    }
+  } else {
+    if (driveStatus) {
+      driveStatus.textContent = "Google Drive integration is ready for use with the configured OAuth credentials.";
+      driveStatus.classList.add("success");
+      driveStatus.classList.remove("warning");
+    }
   }
 }
 
@@ -1192,112 +1361,8 @@ function init() {
     navigator.serviceWorker.register("./service-worker.js").catch(console.warn);
   }
 
+  initDriveUI();
   refreshAll();
 }
 
 window.addEventListener("load", init);
-{
-  "mcqs": [
-    {
-      "subject": "",
-      "topic": "",
-      "question_en": "",
-      "question_te": "",
-      "options_en": ["", "", "", ""],
-      "options_te": ["", "", "", ""],
-      "answer": 0,
-      "explanation_en": "",
-      "explanation_te": "",
-      "additional_info": "",
-      "source_reference": ""
-    }
-  ],
-  "terms": [
-    {
-      "name": "",
-      "category": "",
-      "definition_en": "",
-      "definition_te": "",
-      "source_reference": ""
-    }
-  ]
-}
-
-If a fact is not supported by the source, do not invent it.
-SOURCE MATERIAL:
-${text.slice(0, 24000)}
-`;
-
-    const result = await callGeminiAI(prompt);
-    let parsed;
-
-    try {
-      parsed = JSON.parse(result);
-    } catch {
-      alert("AI returned an unexpected format. Please try again with a shorter document.");
-      return;
-    }
-
-    const questions = Array.isArray(parsed.mcqs) ? parsed.mcqs : [];
-
-    if (!questions.length) {
-      alert("No MCQs were returned. Try another document.");
-      return;
-    }
-
-    const newQuestions = questions.map((q, i) => ({
-      id: "ai-" + Date.now() + "-" + i,
-      exam: "APPSC Group 1",
-      subject: q.subject || "General Studies",
-      topic: q.topic || "Document Analysis",
-      question: q.question_en || q.question_te || "Question",
-      question_te: q.question_te || "",
-      options: Array.isArray(q.options_en) ? q.options_en : ["Option A", "Option B", "Option C", "Option D"],
-      options_te: Array.isArray(q.options_te) ? q.options_te : [],
-      answer: Number.isInteger(q.answer) ? q.answer : 0,
-      explanation: q.explanation_en || "",
-      explanation_te: q.explanation_te || "",
-      additional_info: q.additional_info || "",
-      source: q.source_reference || "Uploaded document"
-    }));
-
-    const existing = new Set(data.mcqs.map(q => String(q.question || "").toLowerCase().trim()));
-    const uniqueQuestions = newQuestions.filter(q => !existing.has(String(q.question).toLowerCase().trim()));
-
-    data.mcqs.push(...uniqueQuestions);
-
-    if (Array.isArray(parsed.terms)) {
-      parsed.terms.forEach(term => {
-        if (!term.name) return;
-        const exists = data.terms.some(
-          old => String(old.name).toLowerCase() === String(term.name).toLowerCase()
-        );
-
-        if (!exists) {
-          data.terms.push({
-            id: "ai-term-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
-            name: term.name,
-            category: term.category || "General Studies",
-            definition: term.definition_en || "",
-            telugu: term.definition_te || ""
-          });
-        }
-      });
-    }
-
-    saveData();
-    refreshAll();
-
-    alert(
-      "AI analysis complete!\n" +
-      "Generated questions: " + questions.length + "\n" +
-      "New non-duplicate questions added: " + uniqueQuestions.length + "\n" +
-      "Terms are added to Terms Explorer."
-    );
-  } catch (error) {
-    alert("AI generation failed: " + error.message);
-  } finally {
-    button.disabled = false;
-    button.textContent = originalText;
-  }
-};
