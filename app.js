@@ -126,3 +126,158 @@ window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();currentDefe
 document.getElementById("installBtn").onclick=async()=>{if(!currentDeferredPrompt)return;currentDeferredPrompt.prompt();await currentDeferredPrompt.userChoice;currentDeferredPrompt=null;document.getElementById("installBtn").classList.add("hidden");};
 if("serviceWorker" in navigator && location.protocol.startsWith("http")){window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(console.warn));}
 refreshAll();
+// Gemini AI integration
+async function callGeminiAI(prompt) {
+  const response = await fetch("/api/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ prompt })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "AI request failed. Please try again.");
+  }
+
+  return data.result;
+}
+
+document.getElementById("makeMcqs").onclick = async () => {
+  const text = document.getElementById("extractedText").value.trim();
+
+  if (!text) {
+    alert("Please upload a text-based PDF or paste text first.");
+    return;
+  }
+
+  const button = document.getElementById("makeMcqs");
+  const originalText = button.textContent;
+
+  button.disabled = true;
+  button.textContent = "Generating AI MCQs...";
+
+  try {
+    const prompt = `
+Analyze the following source material for APPSC Group 1, APPSC Group 2 and UPSC preparation.
+
+Create 15 multiple-choice questions based only on the supplied material.
+For every question provide:
+- topic and subject
+- question in English and Telugu
+- four options in English and Telugu
+- correct answer
+- explanation in English and Telugu
+- additional exam-relevant information
+- source reference or page number only if supplied
+
+Also identify important names, dates, years, schemes, cities, places, rivers, experiments, art and architecture, economic terms, political terms, geography terms, international relations terms, meetings, sports and events.
+
+Return JSON with this structure:
+{
+  "mcqs": [
+    {
+      "subject": "",
+      "topic": "",
+      "question_en": "",
+      "question_te": "",
+      "options_en": ["", "", "", ""],
+      "options_te": ["", "", "", ""],
+      "answer": 0,
+      "explanation_en": "",
+      "explanation_te": "",
+      "additional_info": "",
+      "source_reference": ""
+    }
+  ],
+  "terms": [
+    {
+      "name": "",
+      "category": "",
+      "definition_en": "",
+      "definition_te": "",
+      "source_reference": ""
+    }
+  ]
+}
+
+If a fact is not supported by the source, do not invent it.
+SOURCE MATERIAL:
+${text.slice(0, 24000)}
+`;
+
+    const result = await callGeminiAI(prompt);
+    let parsed;
+
+    try {
+      parsed = JSON.parse(result);
+    } catch {
+      alert("AI returned an unexpected format. Please try again with a shorter document.");
+      return;
+    }
+
+    const questions = Array.isArray(parsed.mcqs) ? parsed.mcqs : [];
+
+    if (!questions.length) {
+      alert("No MCQs were returned. Try another document.");
+      return;
+    }
+
+    const newQuestions = questions.map((q, i) => ({
+      id: "ai-" + Date.now() + "-" + i,
+      exam: "APPSC Group 1",
+      subject: q.subject || "General Studies",
+      topic: q.topic || "Document Analysis",
+      question: q.question_en || q.question_te || "Question",
+      question_te: q.question_te || "",
+      options: Array.isArray(q.options_en) ? q.options_en : ["Option A", "Option B", "Option C", "Option D"],
+      options_te: Array.isArray(q.options_te) ? q.options_te : [],
+      answer: Number.isInteger(q.answer) ? q.answer : 0,
+      explanation: q.explanation_en || "",
+      explanation_te: q.explanation_te || "",
+      additional_info: q.additional_info || "",
+      source: q.source_reference || "Uploaded document"
+    }));
+
+    const existing = new Set(data.mcqs.map(q => String(q.question || "").toLowerCase().trim()));
+    const uniqueQuestions = newQuestions.filter(q => !existing.has(String(q.question).toLowerCase().trim()));
+
+    data.mcqs.push(...uniqueQuestions);
+
+    if (Array.isArray(parsed.terms)) {
+      parsed.terms.forEach(term => {
+        if (!term.name) return;
+        const exists = data.terms.some(
+          old => String(old.name).toLowerCase() === String(term.name).toLowerCase()
+        );
+
+        if (!exists) {
+          data.terms.push({
+            id: "ai-term-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+            name: term.name,
+            category: term.category || "General Studies",
+            definition: term.definition_en || "",
+            telugu: term.definition_te || ""
+          });
+        }
+      });
+    }
+
+    saveData();
+    refreshAll();
+
+    alert(
+      "AI analysis complete!\n" +
+      "Generated questions: " + questions.length + "\n" +
+      "New non-duplicate questions added: " + uniqueQuestions.length + "\n" +
+      "Terms are added to Terms Explorer."
+    );
+  } catch (error) {
+    alert("AI generation failed: " + error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+};
