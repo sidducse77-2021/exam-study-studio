@@ -1,508 +1,283 @@
-:root {
-  --navy: #17324d;
-  --blue: #2463eb;
-  --pale: #eef4fb;
-  --line: #dce4ee;
-  --text: #1f2d3d;
-  --muted: #66758a;
-  --white: #ffffff;
-  --green: #e8f7ee;
-  --amber: #fff6df;
-  --red: #b42318;
-  --danger: #d92d20;
-  --shadow: 0 10px 30px rgba(17, 24, 39, 0.06);
-}
-
-* { box-sizing: border-box; }
-
-html { scroll-behavior: smooth; }
-
-body {
-  margin: 0;
-  background: #f5f7fb;
-  color: var(--text);
-  font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-button, input, select, textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-a {
-  color: var(--blue);
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-.topbar {
-  background: linear-gradient(135deg, var(--navy), #0d1b2c);
-  color: var(--white);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 22px 28px;
-}
-
-.eyebrow {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
-  opacity: 0.8;
-  margin-bottom: 6px;
-}
-
-.topbar h1 {
-  margin: 0;
-  font-size: clamp(1.8rem, 2vw, 2.4rem);
-}
-
-.subtitle {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.layout {
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  min-height: calc(100vh - 140px);
-}
-
-.sidebar {
-  background: #f0f3f8;
-  padding: 18px 12px;
-  border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.nav {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  padding: 10px 12px;
-  text-align: left;
-  color: var(--text);
-  transition: 0.15s ease;
-}
-
-.nav.active, .nav:hover {
-  background: white;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
-}
-
-main {
-  padding: 22px;
-}
-
-.view {
-  display: none;
-}
-
-.view.active {
-  display: block;
-}
-
-.section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.section-heading h2 {
-  margin: 0;
-  font-size: clamp(1.5rem, 2vw, 2rem);
-}
-
-.section-heading p {
-  margin: 5px 0 0;
-  color: var(--muted);
-}
-
-.panel, .note-card, .alert-card, .task-card, .summary-card, .countdown-card {
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: var(--shadow);
-}
-
-.welcome {
-  margin-bottom: 18px;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: var(--pale);
-  color: var(--navy);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(140px, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.stat {
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: var(--shadow);
-}
-
-.stat span {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.stat strong {
-  font-size: clamp(1.4rem, 2vw, 2.1rem);
-}
-
-.quick-grid, .summary-grid, .countdown-grid, .cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 14px;
-}
-
-.quick {
-  background: linear-gradient(180deg, #f4f8ff, #edf4ff);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 16px;
-  text-align: left;
-}
-
-.quick strong, .quick span {
-  display: block;
-}
-
-.quick span {
-  margin-top: 6px;
-  color: var(--muted);
-}
-
-.notice, .result-box, .status {
-  margin-top: 14px;
-  border-radius: 12px;
-  background: #f8fbff;
-  border: 1px solid var(--line);
-  padding: 12px 14px;
-}
-
-.status.warning {
-  background: #fff8e7;
-  border-color: #f4d38d;
-  color: #7c4b00;
-}
-
-.status.success {
-  background: #eafaf0;
-  border-color: #a8d8b8;
-  color: #0c5a2d;
-}
-
-.toolbar, .row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.toolbar {
-  margin-bottom: 12px;
-}
-
-.row.wrap {
-  flex-wrap: wrap;
-}
-
-input, select, textarea {
-  width: 100%;
-  border: 1px solid var(--line);
-  background: white;
-  border-radius: 10px;
-  padding: 10px 12px;
-  color: var(--text);
-}
-
-textarea {
-  min-height: 100px;
-  resize: vertical;
-}
-
-button.primary, button.secondary, .file-button {
-  border-radius: 12px;
-  border: 1px solid transparent;
-  padding: 10px 14px;
-  transition: 0.15s ease;
-}
-
-button.primary {
-  background: var(--navy);
-  color: var(--white);
-}
-
-button.secondary {
-  background: #f4f7fa;
-  border-color: var(--line);
-  color: var(--text);
-}
-
-button.danger {
-  color: var(--danger);
-  border-color: rgba(217, 45, 32, 0.2);
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 12px;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.88rem;
-}
-
-.hidden {
-  display: none !important;
-}
-
-.mcq-layout {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  gap: 18px;
-}
-
-.question-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.question-item {
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
-  text-align: left;
-  width: 100%;
-}
-
-.question-item.active {
-  border-color: var(--blue);
-  background: #edf4ff;
-}
-
-.question-item small {
-  display: block;
-  margin-top: 8px;
-  color: var(--muted);
-}
-
-.mcq-choices {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.mcq-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #f8fbff;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px;
-}
-
-.mcq-option.correct-answer {
-  border-color: rgba(78, 168, 116, 0.5);
-  background: var(--green);
-}
-
-.mcq-option input {
-  width: auto;
-}
-
-.explanation {
-  margin-top: 12px;
-  padding: 12px;
-  background: #f7f9fc;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-}
-
-.telugu {
-  font-family: "Noto Sans Telugu", "Nirmala UI", sans-serif;
-  line-height: 1.8;
-}
-
-.cards-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.note-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.note-card h3, .alert-card h3 {
-  margin: 0;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-.empty-state {
-  padding: 18px 14px;
-  border-radius: 12px;
-  background: #f7f9fc;
-  border: 1px dashed var(--line);
-  color: var(--muted);
-}
-
-.task-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.task-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.task-check input {
-  width: auto;
-}
-
-.summary-card, .countdown-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.summary-card small, .summary-card span {
-  color: var(--muted);
-}
-
-.file-button {
-  position: relative;
-  overflow: hidden;
-  display: inline-block;
-  background: #f4f7fa;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 14px;
-  color: var(--text);
-}
-
-.file-button input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.drive-list {
-  margin-top: 14px;
-  display: grid;
-  gap: 10px;
-}
-
-.drive-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: #f9fbff;
-}
-
-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 16px 24px 28px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-@media (max-width: 960px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-    flex-direction: row;
-    overflow-x: auto;
-    padding: 12px;
-  }
-
-  .nav {
-    white-space: nowrap;
-  }
-
-  .mcq-layout {
-    grid-template-columns: 1fr;
+export async function onRequestPost(context) {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Content-Type": "application/json; charset=utf-8"
+  };
+
+  try {
+    if (!context.env.GEMINI_API_KEY) {
+      return new Response(JSON.stringify({
+        error: "GEMINI_API_KEY is not configured in Cloudflare Pages environment variables."
+      }), {
+        status: 500,
+        headers: corsHeaders
+      });
+    }
+
+    const contentType = context.request.headers.get("content-type") || "";
+    const isJson = contentType.includes("application/json");
+    const isFormData = contentType.includes("multipart/form-data");
+
+    let body = {};
+    let model = "gemini-2.5-flash";
+
+    if (isJson) {
+      body = await context.request.json().catch(() => ({}));
+      model = typeof body.model === "string" ? body.model : model;
+    } else if (isFormData) {
+      const form = await context.request.formData().catch(() => null);
+      if (!form) {
+        return new Response(JSON.stringify({ error: "Invalid multipart form submission." }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      const file = form.get("file");
+      const kind = String(form.get("kind") || "");
+      const requestedModel = String(form.get("model") || "gemini-2.5-flash");
+      model = requestedModel || model;
+
+      if (!file || !(file instanceof File)) {
+        return new Response(JSON.stringify({ error: "No file was supplied for OCR." }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      if (kind !== "ocr" && kind !== "image") {
+        return new Response(JSON.stringify({ error: "Unsupported OCR request type." }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+
+      const requestBody = {
+        contents: [{
+          parts: [
+            {
+              inline_data: {
+                mime_type: file.type || "image/png",
+                data: base64
+              }
+            },
+            {
+              text: "Extract all readable text from this image or scanned document. Return only the extracted text, no comments, no markup, and no invented facts. If the content is unclear, return the clearest readable text and label uncertainty only when necessary."
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 3000,
+          responseMimeType: "text/plain"
+        }
+      };
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+      const maxAttempts = 3;
+      let lastStatus = 0;
+      let lastError = "Gemini request failed.";
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": context.env.GEMINI_API_KEY
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        lastStatus = response.status;
+        const result = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          const text = result.candidates?.[0]?.content?.parts
+            ?.map((part) => part.text || "")
+            .join("")
+            .trim();
+
+          if (!text) {
+            return new Response(JSON.stringify({
+              error: "Gemini returned no text for the provided image."
+            }), {
+              status: 502,
+              headers: corsHeaders
+            });
+          }
+
+          return new Response(JSON.stringify({ result: text }), {
+            status: 200,
+            headers: corsHeaders
+          });
+        }
+
+        const permanentStatus = [400, 401, 403, 404].includes(response.status);
+        if (permanentStatus) {
+          return new Response(JSON.stringify({
+            error: result.error?.message || "The request was rejected by the Gemini API."
+          }), {
+            status: response.status,
+            headers: corsHeaders
+          });
+        }
+
+        const transientStatus = [408, 429, 500, 502, 503, 504].includes(response.status);
+        if (!transientStatus || attempt >= maxAttempts) {
+          lastError = result.error?.message || "Gemini OCR request failed.";
+          break;
+        }
+
+        const jitter = Math.floor(Math.random() * 300) + 200 * attempt;
+        await new Promise((resolve) => setTimeout(resolve, jitter));
+      }
+
+      return new Response(JSON.stringify({
+        error: lastError
+      }), {
+        status: lastStatus || 500,
+        headers: corsHeaders
+      });
+    }
+
+    if (!isJson) {
+      return new Response(JSON.stringify({
+        error: "Request body must be JSON."
+      }), {
+        status: 415,
+        headers: corsHeaders
+      });
+    }
+
+    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
+    if (!prompt) {
+      return new Response(JSON.stringify({
+        error: "Please provide a prompt."
+      }), {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+
+    if (prompt.length > 32000) {
+      return new Response(JSON.stringify({
+        error: "Input is too long. Please send a smaller section or split the material into chunks."
+      }), {
+        status: 413,
+        headers: corsHeaders
+      });
+    }
+
+    const requestBody = {
+      contents: [{
+        parts: [{
+          text: `You are a careful, bilingual exam-preparation assistant. Use only the supplied material as primary evidence. Never invent facts or official sources. If a fact is not supported by the supplied text, say so clearly. Do not claim verification or official status. Return valid JSON only when asked, otherwise respond clearly in English and Telugu where helpful.
+
+User request:
+${prompt}`
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 3000,
+        responseMimeType: "application/json"
+      }
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const maxAttempts = 3;
+    let lastStatus = 0;
+    let lastPayload = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": context.env.GEMINI_API_KEY
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      lastStatus = response.status;
+      const result = await response.json().catch(() => ({}));
+      lastPayload = result;
+
+      if (response.ok) {
+        const text = result.candidates?.[0]?.content?.parts
+          ?.map((part) => part.text || "")
+          .join("")
+          .trim();
+
+        if (!text) {
+          return new Response(JSON.stringify({
+            error: "Gemini returned no usable payload."
+          }), {
+            status: 502,
+            headers: corsHeaders
+          });
+        }
+
+        return new Response(JSON.stringify({ result: text }), {
+          status: 200,
+          headers: corsHeaders
+        });
+      }
+
+      const permanentStatus = [400, 401, 403, 404].includes(response.status);
+      if (permanentStatus) {
+        return new Response(JSON.stringify({
+          error: result.error?.message || "The request was rejected by the Gemini API. Check the model name and credentials."
+        }), {
+          status: response.status,
+          headers: corsHeaders
+        });
+      }
+
+      const transientStatus = [408, 429, 500, 502, 503, 504].includes(response.status);
+      if (!transientStatus || attempt >= maxAttempts) {
+        return new Response(JSON.stringify({
+          error: result.error?.message || "Gemini API request failed."
+        }), {
+          status: response.status || 500,
+          headers: corsHeaders
+        });
+      }
+
+      const jitter = Math.floor(Math.random() * 300) + 200 * attempt;
+      await new Promise((resolve) => setTimeout(resolve, jitter));
+    }
+
+    return new Response(JSON.stringify({
+      error: lastPayload?.error?.message || "Gemini request failed after retries."
+    }), {
+      status: lastStatus || 500,
+      headers: corsHeaders
+    });
+
+  } catch (error) {
+    console.error("Generate API error", error);
+    return new Response(JSON.stringify({
+      error: "Request failed. Check the input and try again."
+    }), {
+      status: 500,
+      headers: corsHeaders
+    });
   }
 }
 
-@media (max-width: 640px) {
-  .topbar {
-    padding: 18px 16px;
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  main {
-    padding: 16px;
-  }
-
-  .stats {
-    grid-template-columns: repeat(2, minmax(140px, 1fr));
-  }
-
-  footer {
-    flex-direction: column;
-  }
+export async function onRequestOptions() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    }
+  });
 }
