@@ -1,0 +1,10 @@
+{
+  "name": "Exam Study Studio",
+  "short_name": "Exam Studio",
+  "description": "Personal competitive examination study workspace",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#17324d",
+  "icons": []
+}
