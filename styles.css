@@ -217,6 +217,12 @@ main {
   color: #7c4b00;
 }
 
+.status.success {
+  background: #eafaf0;
+  border-color: #a8d8b8;
+  color: #0c5a2d;
+}
+
 .toolbar, .row {
   display: flex;
   gap: 10px;
@@ -431,6 +437,23 @@ label {
   inset: 0;
   opacity: 0;
   cursor: pointer;
+}
+
+.drive-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.drive-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #f9fbff;
 }
 
 footer {
