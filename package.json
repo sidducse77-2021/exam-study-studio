@@ -1,0 +1,8 @@
+{
+  "name": "exam-study-studio",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "check": "node --experimental-default-type=module --check app.js && node --experimental-default-type=module --check functions/api/generate.js"
+  }
+}
