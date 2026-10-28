@@ -33,7 +33,7 @@ export async function onRequestPost({ request, env }) {
       : `You are an exam MCQ writer for APPSC Group 1 and UPSC. Use ONLY the source text below. Generate 10 distinct, source-grounded MCQs with four options each, correct answer index 0-3, English explanation, Telugu explanation, subject, topic, difficulty, and source. Also extract up to 20 important terms/entities (people, schemes, years, experiments, cities/places, rivers, institutions, political/economic/geographical/science terms, events) with brief English definition and Telugu meaning when supported. Do not invent unsupported facts. Return ONLY valid JSON with schema: {"mcqs":[{"question":"...","options":["...","...","...","..."],"answer":0,"explanation":"...","telugu":"...","subject":"...","topic":"...","difficulty":"Intermediate","source":"${title}","tags":[]}],"terms":[{"name":"...","category":"...","definition":"...","telugu":"...","source":"${title}"}]}. Ensure answer is an integer 0-3.\n\nSOURCE TEXT:\n${sourceText}`;
   try {
     const res = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
       {
         method: "POST",
         headers: {
