@@ -1,64 +1,25 @@
-# Exam Study Studio
-
-A bilingual, mobile-first exam preparation workspace for UPSC, APPSC, SSC, RRB, CTET, DSC, TET and related competitive exams.
-
-## Features included in this upgrade
-
-- Bilingual English + Telugu support across study flows
-- Central MCQ library with filtering, set navigation and exports
-- Document upload support for PDF, TXT, MD, DOCX and image files where feasible
-- AI-powered MCQ generation using the Cloudflare Pages backend and Gemini API
-- Safe API handling with validation, retries, quota awareness and clear error messages
-- Study dashboard with progress, countdowns and task planning
-- Terms explorer, notes, exam alerts and data backup
-- Google Drive workflow that remains disabled until secure OAuth config is complete
-- Clear labeling of cloud sync and Drive workflows as gated until credentials are configured
-
-## Important limitations
-
-- Google Drive OAuth is not active until the Google Cloud credentials and redirect URIs are configured.
-- Cloud persistence is not active unless a tested real database and auth flow are set up.
-- Image OCR and multimodal processing require a configured backend or library.
-- Live news crawling is not implemented and is not claimed as working.
-- AI-generated content must still be checked for factual accuracy and official verification.
-
-## Local development
-
-1. Open the repo root in a static web server.
-2. Example:
-   `python -m http.server 8000`
-3. Visit:
-   `http://localhost:8000`
-
-## Cloudflare Pages deployment
-
-1. Push this repo to GitHub.
-2. In Cloudflare Pages, create a project connected to the repo.
-3. Keep the project root as the deployment root.
-4. Add the following env vars:
-   - `GEMINI_API_KEY`
-   - `GOOGLE_CLIENT_ID`
-   - `GOOGLE_CLIENT_SECRET`
-   - `GOOGLE_REFRESH_TOKEN`
-   - `GOOGLE_REDIRECT_URI`
-5. Deploy and confirm `/api/generate` responds with valid JSON.
-6. Verify the Drive routes and the OAuth callback configuration before enabling real import workflows.
-
-## Google Drive setup
-
-See `GOOGLE_DRIVE_SETUP.md` for the exact Google Cloud configuration steps.
-
-## Backup and safety
-
-- Download full backup from Backup & Settings.
-- Keep a copy in a safe location before major changes.
-- Local data is preserved in browser storage and can be restored using the JSON backup.
-- Google Drive imports are only operational after server-side credentials are properly configured.
-
-## Available validation
-
-Run:
-
-`npm run check`
-
-This validates the basic JavaScript syntax for the app and the Cloudflare Functions handlers.
+Exam Study Studio
+Bilingual (English + Telugu) study workspace for UPSC, APPSC, RRB, SSC, CTET, DSC and TET.
+Included
+Master MCQ collection, filters, sets, print/export and revision
+Document workspace for PDF/TXT/MD/DOCX and image uploads
+Gemini MCQ generation via Cloudflare Pages Function
+Gemini OCR endpoint for supported image formats
+Terms Explorer, notes, alerts, study planner and local backup
+Google Drive listing/import routes (requires one-time OAuth configuration)
+Retry handling and clearer API errors for transient Gemini failures
+Deploy
+Push the repository to GitHub and connect it to Cloudflare Pages.
+Set the build output directory to the repository root (no build command is needed for the static app).
+Add GEMINI_API_KEY as a Cloudflare Pages Production Secret.
+Redeploy and test the Documents workspace with a small text-based PDF.
+For Drive, follow GOOGLE_DRIVE_SETUP.md and add the required OAuth secrets/redirect URI.
+Current limitations
+Browser records are stored in localStorage; they do not automatically sync between devices.
+Google Drive integration remains unavailable until OAuth credentials and refresh token are correctly configured.
+Drive PDF import opens the file for manual download/upload; it does not yet run automatic page-by-page OCR on Drive PDFs.
+Image OCR accepts PNG/JPG/JPEG/WEBP/GIF up to 7 MB.
+Rate-limit retries cannot bypass Gemini project quota limits.
+AI-generated material should be verified against official sources.
+Local preview
+Run python -m http.server 8000 from the repository root, then open http://localhost:8000.
