@@ -8,78 +8,67 @@ const reply = (body, status = 200) =>
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Retry only temporary failures. A second model is attempted if the primary
-// model is busy/unavailable; the API key remains server-side in Cloudflare.
-async function callGemini({ model, prompt, action, apiKey }) {
+async function readResponse(response) {
+  const raw = await response.text();
+  if (!raw) return { data: {}, raw: "" };
+  try {
+    return { data: JSON.parse(raw), raw };
+  } catch {
+    // Some gateways return plain text (for example, "error code: 524").
+    return { data: {}, raw };
+  }
+}
+
+async function requestModel({ model, prompt, action, apiKey }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const maxAttempts = 3;
+  let response;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    let response;
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig:
-            action === "mcqs"
-              ? { responseMimeType: "application/json", temperature: 0.2 }
-              : { temperature: 0.3 },
-        }),
-      });
-    } catch (error) {
-      if (attempt < maxAttempts - 1) {
-        await sleep(700 * (attempt + 1));
-        continue;
-      }
-      return {
-        ok: false,
-        status: 502,
-        message: `Could not connect to Gemini: ${
-          error?.message || "network error"
-        }`,
-      };
-    }
-
-    const raw = await response.text();
-    let data;
-    try {
-      data = raw ? JSON.parse(raw) : {};
-    } catch {
-      data = {};
-    }
-
-    if (response.ok) {
-      return { ok: true, data };
-    }
-
-    const message =
-      data?.error?.message || `Gemini API returned HTTP ${response.status}.`;
-
-    // 429/500/502/503/504 are potentially temporary. Retry with backoff.
-    const retryable = [429, 500, 502, 503, 504].includes(response.status);
-    if (retryable && attempt < maxAttempts - 1) {
-      const retryAfter = Number(response.headers.get("Retry-After"));
-      const waitMs =
-        Number.isFinite(retryAfter) && retryAfter > 0
-          ? Math.min(retryAfter * 1000, 8000)
-          : Math.min(1000 * 2 ** attempt, 4000);
-      await sleep(waitMs);
-      continue;
-    }
-
-    return { ok: false, status: response.status, message };
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      signal: AbortSignal.timeout(25000),
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig:
+          action === "mcqs"
+            ? { responseMimeType: "application/json", temperature: 0.2 }
+            : { temperature: 0.3 },
+      }),
+    });
+  } catch (error) {
+    const timedOut =
+      error?.name === "TimeoutError" || error?.name === "AbortError";
+    return {
+      ok: false,
+      status: 504,
+      message: timedOut
+        ? "Gemini request timed out after 25 seconds. Try a smaller document."
+        : `Could not connect to Gemini: ${error?.message || "network error"}`,
+      retryable: true,
+    };
   }
 
-  return {
-    ok: false,
-    status: 503,
-    message: "Gemini is temporarily unavailable. Please try again.",
-  };
+  const { data, raw } = await readResponse(response);
+
+  if (response.ok) {
+    return { ok: true, data };
+  }
+
+  const message =
+    data?.error?.message ||
+    (raw ? raw.slice(0, 300) : `Gemini API returned HTTP ${response.status}.`);
+
+  const retryable =
+    [408, 429, 500, 502, 503, 504, 524].includes(response.status) ||
+    /error code:\s*524|temporarily unavailable|high demand|overloaded/i.test(
+      message
+    );
+
+  return { ok: false, status: response.status, message, retryable };
 }
 
 export async function onRequestPost({ request, env }) {
@@ -108,8 +97,14 @@ export async function onRequestPost({ request, env }) {
     return reply({ error: "Unsupported action." }, 400);
   }
 
-  // Avoid sending an unbounded document in a single API request.
-  const sourceText = text.slice(0, 60000);
+  // Keep the input bounded to reduce model latency and gateway timeouts.
+  // Tell the model that the supplied text may be an excerpt.
+  const maxChars = action === "mcqs" ? 30000 : 40000;
+  const sourceText = text.slice(0, maxChars);
+  const truncatedNote =
+    text.length > maxChars
+      ? `\n\nNOTE: The source was shortened to the first ${maxChars} characters to reduce timeout risk. Do not claim the entire original document was reviewed.`
+      : "";
   const title = String(body.title || "Study document").slice(0, 200);
 
   const prompt =
@@ -119,115 +114,106 @@ export async function onRequestPost({ request, env }) {
 ACCURACY RULES:
 - Preserve important names, dates, places, dynasties, rulers, terms, numbers and claims from the source.
 - Do not silently correct or replace source facts. Put questionable or conflicting facts in "Facts to verify".
-- Separate source-derived facts from "Supplementary context". Never pretend added context came from the uploaded PDF.
-- Do not invent recent events, statistics, or citations. This request has no live web search. Any time-sensitive current-affairs link must be marked "Needs latest-source verification" and name a suitable official source to check. If no clear link exists, say so.
-- Avoid unrelated padding and long paragraphs. Explain difficult terms simply.
+- Separate source-derived facts from "Supplementary context". Do not invent recent events, statistics, or citations.
+- This request has no live web search. Mark time-sensitive current-affairs links "Needs latest-source verification" and name an official source to check. If no clear link exists, say so.
+- Avoid unrelated padding and long paragraphs.
 
-USE THIS EXACT NOTE STRUCTURE:
-# [Topic title]
-## 1. Topic at a glance
-Give a beginner-friendly 3–6 line overview in Telugu + English keywords and explain relevance to APPSC Group 1 / UPSC.
-
-## 2. Concept explained step by step
-Short sections, bullets, simple definitions, and clear cause/effect. Keep paragraphs under 4 lines.
-
-## 3. Mind map
-Create a topic-specific text mind map using branches and arrows:
-TOPIC
-├── Factor / person → development
-├── Factor / person → development
-└── outcome → historical significance
-Use source-specific facts, not generic filler.
-
-## 4. Timeline / chronology
-Table columns: Year/period | Ruler/dynasty/event | What happened | Exam relevance. Use only dates supported by the source; label approximate or conflicting dates.
-
-## 5. Important people, places and terms
-Table columns: Name/term | Role or meaning | Related topic | Prelims clue.
-
+FORMAT:
+# Topic title
+## 1. Topic at a glance (simple Telugu + English terms; exam relevance)
+## 2. Concept explained step by step (short sections and bullets)
+## 3. Mind map (topic-specific branches using ├──, └── and →)
+## 4. Timeline table (Year/period | Ruler/event | What happened | Exam relevance)
+## 5. Important people, places and terms table (Name | Role/meaning | Related topic | Prelims clue)
 ## 6. Cause → process → result
-Explain why the development happened, how it progressed, and what changed. Use arrows or a table.
+## 7. Topic connections / syllabus interlinking (mark added knowledge Supplementary context)
+## 8. APPSC Group 1 / UPSC Prelims focus (high-yield facts, confusing pairs, 5 possible question angles)
+## 9. Mains answer-building (5–7 points and Introduction → Body → Conclusion framework)
+## 10. Current-affairs connection (do not claim latest without verification)
+## 11. One-page quick revision (10–15 recall points, memory chain, 5 terms with Telugu meanings)
+## 12. Practice questions (5 MCQs with options and explanations, then 2 Mains questions; answer key at end)
+## 13. Facts to verify / source limits
+Use readable Markdown, tables, bullets, arrows and concise bilingual explanations. Avoid long continuous paragraphs and repeated facts. Document: ${title}${truncatedNote}
 
-## 7. Topic connections / interlinking
-Connect to relevant syllabus themes only where useful. For ancient history, consider geography, economy, polity, society, religion/philosophy, archaeology, art/culture and other Mahajanapadas as appropriate. Show links as Topic A → reason/connection → Topic B → exam use. Mark added background as "Supplementary context".
-
-## 8. APPSC Group 1 / UPSC Prelims focus
-High-yield facts, commonly confused facts in a comparison table, and 5 possible question angles (never claim guaranteed questions).
-
-## 9. Mains answer-building
-Give analytical dimensions, 5–7 usable points, and one framework: Introduction → Body headings → Conclusion. Do not invent data or quotations.
-
-## 10. Current-affairs connection
-Only include a genuinely relevant connection. Do not claim it is the latest without live verification. Mark time-sensitive context "Needs latest-source verification" and name an official source to check. If none is evident, say: "No direct current-affairs link established from the supplied material; verify current updates separately."
-
-## 11. One-page quick revision
-10–15 one-line recall points, one compact memory chain, and 5 English keywords with simple Telugu meanings.
-
-## 12. Practice questions
-5 source-grounded MCQs with four options, answers and short explanations; then 2 short-answer/Mains questions. Put the answer key after the questions.
-
-## 13. Source limits / facts to verify
-List unclear, missing, approximate or internally inconsistent details. If none are apparent, say this is not an independent fact-check.
-
-STYLE:
-- Make the output look like well-designed study notes, not a formal article or continuous essay.
-- Prefer tables, bullets, bold keywords, arrows, mini flowcharts and short bilingual explanations.
-- Keep Telugu easy to understand and retain standard English terminology in brackets.
-- Avoid repeating the same fact in every section.
-- Return plain Markdown, not JSON and not code fences.
-- Document title: ${title}
-
-UPLOADED SOURCE TEXT:
+SOURCE TEXT:
 ${sourceText}`
-      : `You are an exam MCQ writer for APPSC Group 1 and UPSC. Use ONLY the source text below. Generate 10 distinct, source-grounded MCQs with four options each, correct answer index 0-3, English explanation, Telugu explanation, subject, topic, difficulty, and source. Also extract up to 20 important terms/entities (people, schemes, years, experiments, cities/places, rivers, institutions, political/economic/geographical/science terms, events) with brief English definition and Telugu meaning when supported. Do not invent unsupported facts. Return ONLY valid JSON with schema: {"mcqs":[{"question":"...","options":["...","...","...","..."],"answer":0,"explanation":"...","telugu":"...","subject":"...","topic":"...","difficulty":"Intermediate","source":"${title}","tags":[]}],"terms":[{"name":"...","category":"...","definition":"...","telugu":"...","source":"${title}"}]}. Ensure answer is an integer 0-3.\n\nSOURCE TEXT:\n${sourceText}`;
-  // Try the preferred model first, then a fallback model if it remains busy or
-  // unavailable. The fallback is also retried for temporary server failures.
+      : `You are an exam MCQ writer for APPSC Group 1 and UPSC. Use ONLY the supplied source text. Generate 10 distinct MCQs with four options, answer index 0-3, English explanation, Telugu explanation, subject, topic, difficulty, source, and tags. Also extract up to 20 important terms/entities with brief English definitions and Telugu meanings where supported. Do not invent unsupported facts. Return ONLY valid JSON matching: {"mcqs":[{"question":"...","options":["...","...","...","..."],"answer":0,"explanation":"...","telugu":"...","subject":"...","topic":"...","difficulty":"Intermediate","source":"${title}","tags":[]}],"terms":[{"name":"...","category":"...","definition":"...","telugu":"...","source":"${title}"}]}. Answer must be an integer 0-3. If the source was shortened, use only the provided excerpt and do not claim complete coverage.${truncatedNote}
+
+SOURCE TEXT:
+${sourceText}`;
+
+  // Keep retries limited: long retry chains can themselves trigger gateway 524s.
   const models = ["gemini-3.8-flash", "gemini-2.5-flash"];
-  let result;
   let lastMessage = "";
+  let lastStatus = 503;
+  let successData = null;
 
   for (const model of models) {
-    result = await callGemini({
+    let result = await requestModel({
       model,
       prompt,
       action,
       apiKey: env.GEMINI_API_KEY,
     });
 
-    if (result.ok) break;
-    lastMessage = result.message;
+    if (result.ok) {
+      successData = result.data;
+      break;
+    }
 
-    // Only switch models for temporary/server-side availability errors or
-    // model-not-found/retired errors. Don't hide auth, permission, or bad input.
-    const temporary = [429, 500, 502, 503, 504].includes(result.status);
-    const modelUnavailable =
-      /model.*(not found|not available|no longer available|unsupported)/i.test(
-        lastMessage
-      );
-    if (!temporary && !modelUnavailable) {
-      return reply({ error: lastMessage }, result.status === 400 ? 400 : 502);
+    lastMessage = result.message;
+    lastStatus = result.status;
+
+    // Only make one short retry for temporary failures, then try fallback.
+    if (result.retryable) {
+      await sleep(800);
+      result = await requestModel({
+        model,
+        prompt,
+        action,
+        apiKey: env.GEMINI_API_KEY,
+      });
+      if (result.ok) {
+        successData = result.data;
+        break;
+      }
+      lastMessage = result.message;
+      lastStatus = result.status;
+    } else {
+      const modelUnavailable =
+        /model.*(not found|not available|no longer available|unsupported)/i.test(
+          lastMessage
+        );
+      if (!modelUnavailable) {
+        return reply({ error: lastMessage }, 502);
+      }
     }
   }
 
-  if (!result?.ok) {
+  if (!successData) {
+    const isTimeout =
+      lastStatus === 524 ||
+      lastStatus === 504 ||
+      /error code:\s*524|timed out|timeout/i.test(lastMessage);
     return reply(
       {
-        error: `Gemini is temporarily busy or unavailable. Automatic retries and fallback were attempted. ${
-          lastMessage || "Please try again shortly."
-        }`,
+        error: isTimeout
+          ? "Gemini request timed out (524/504). The document may be too large or the service is busy. Try again with a shorter document or select a smaller PDF section."
+          : `Gemini is temporarily busy or unavailable. Automatic retry and fallback were attempted. ${
+              lastMessage || "Please try again shortly."
+            }`,
       },
-      503
+      isTimeout ? 504 : 503
     );
   }
 
-  const data = result.data;
-  const output = data?.candidates?.[0]?.content?.parts
+  const output = successData?.candidates?.[0]?.content?.parts
     ?.map((part) => part.text || "")
     .join("\n")
     .trim();
 
   if (!output) {
-    const blockReason = data?.promptFeedback?.blockReason;
+    const blockReason = successData?.promptFeedback?.blockReason;
     return reply(
       {
         error: blockReason
