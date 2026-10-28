@@ -525,3 +525,462 @@ document.addEventListener("DOMContentLoaded", () => {
   bindNavigation();
   go("dashboard");
 });
+// ===== EXAM STUDY STUDIO: FUNCTIONALITY FIX =====
+
+function renderAlerts() {
+  const el = document.getElementById("alertList");
+  if (!el) return;
+
+  el.innerHTML = data.alerts.map((a, i) => `
+    <article class="panel">
+      <h3>${esc(a.title)}</h3>
+      <p>${esc(a.exam)} | ${esc(a.date || "No date")}</p>
+      ${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">Open official link</a>` : ""}
+      <button class="secondary" data-delete-alert="${i}">Delete</button>
+    </article>
+  `).join("") || "<p>No alerts saved.</p>";
+
+  el.querySelectorAll("[data-delete-alert]").forEach(b => {
+    b.onclick = () => {
+      data.alerts.splice(Number(b.dataset.deleteAlert), 1);
+      saveData();
+    };
+  });
+}
+
+function renderTasks() {
+  const el = document.getElementById("taskList");
+  if (!el) return;
+
+  el.innerHTML = data.tasks.map((t, i) => `
+    <article class="panel">
+      <label>
+        <input type="checkbox" data-task-done="${i}" ${t.done ? "checked" : ""}>
+        ${esc(t.text)} (${esc(t.exam || "")})
+      </label>
+      <button class="secondary" data-task-delete="${i}">Delete</button>
+    </article>
+  `).join("") || "<p>No study tasks yet.</p>";
+
+  el.querySelectorAll("[data-task-done]").forEach(b => {
+    b.onchange = () => {
+      data.tasks[Number(b.dataset.taskDone)].done = b.checked;
+      saveData();
+    };
+  });
+
+  el.querySelectorAll("[data-task-delete]").forEach(b => {
+    b.onclick = () => {
+      data.tasks.splice(Number(b.dataset.taskDelete), 1);
+      saveData();
+    };
+  });
+}
+
+function renderBackupStatus() {}
+function renderDriveStatus() {}
+
+function setPdfStatus(message) {
+  const el = document.getElementById("pdfStatus");
+  if (el) el.textContent = message;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Navigation and initial rendering
+  bindNavigation();
+  refreshAll();
+
+  // PDF, TXT, Markdown and DOCX extraction
+  const upload = document.getElementById("pdfUpload");
+
+  if (upload) {
+    upload.addEventListener("change", async () => {
+      const file = upload.files && upload.files[0];
+      if (!file) return;
+
+      const output = document.getElementById("extractedText");
+      if (!output) return;
+
+      output.value = "";
+      setPdfStatus("Reading " + file.name + "...");
+
+      try {
+        const name = file.name.toLowerCase();
+
+        if (name.endsWith(".txt") || name.endsWith(".md")) {
+          output.value = await file.text();
+        } else if (name.endsWith(".pdf")) {
+          if (!window.pdfjsLib) {
+            throw new Error("PDF.js did not load. Check your internet connection and refresh.");
+          }
+
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+          const buffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({
+            data: new Uint8Array(buffer)
+          }).promise;
+
+          const pages = [];
+
+          for (let p = 1; p <= pdf.numPages; p++) {
+            setPdfStatus(`Extracting PDF text: page ${p} of ${pdf.numPages}`);
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            pages.push(
+              content.items.map(item => item.str || "").join(" ")
+            );
+          }
+
+          output.value = pages.join("\n\n");
+
+          if (!output.value.trim()) {
+            setPdfStatus("No selectable text found. This may be a scanned PDF; OCR is required.");
+            return;
+          }
+        } else if (name.endsWith(".docx")) {
+          if (!window.mammoth) {
+            throw new Error("DOCX reader did not load. Refresh and try again.");
+          }
+
+          const result = await mammoth.extractRawText({
+            arrayBuffer: await file.arrayBuffer()
+          });
+
+          output.value = result.value;
+        } else {
+          throw new Error("This file type is not supported for text extraction.");
+        }
+
+        setPdfStatus(
+          `Extraction complete. ${output.value.length} characters extracted.`
+        );
+      } catch (error) {
+        console.error("Document extraction failed:", error);
+        setPdfStatus("Extraction failed: " + error.message);
+      }
+    });
+  }
+
+  // Save extracted text
+  document.getElementById("saveDocument")?.addEventListener("click", () => {
+    const text = document.getElementById("extractedText")?.value.trim();
+    const file = document.getElementById("pdfUpload")?.files?.[0];
+
+    if (!text) {
+      alert("Please upload a readable document or paste text first.");
+      return;
+    }
+
+    data.documents.unshift({
+      id: id("doc"),
+      name: file?.name || document.getElementById("articleTitle")?.value || "Pasted document",
+      type: file?.name.split(".").pop() || "text",
+      text,
+      createdAt: new Date().toISOString()
+    });
+
+    saveData();
+    setPdfStatus("Document saved successfully.");
+  });
+
+  // Create notes from extracted text
+  document.getElementById("makeNotes")?.addEventListener("click", () => {
+    const text = document.getElementById("extractedText")?.value.trim();
+    if (!text) {
+      alert("Upload a document or paste text first.");
+      return;
+    }
+
+    data.notes.unshift({
+      id: id("note"),
+      title: document.getElementById("articleTitle")?.value ||
+        document.getElementById("pdfUpload")?.files?.[0]?.name ||
+        "Document notes",
+      body: text,
+      createdAt: new Date().toISOString()
+    });
+
+    saveData();
+    alert("Notes saved. Open Study Notes to review them.");
+  });
+
+  // Download extracted text
+  document.getElementById("downloadText")?.addEventListener("click", () => {
+    const text = document.getElementById("extractedText")?.value || "";
+    if (!text.trim()) {
+      alert("There is no text to download.");
+      return;
+    }
+    download("extracted-document.txt", text);
+  });
+
+  // Add study note
+  document.getElementById("saveNote")?.addEventListener("click", () => {
+    const title = document.getElementById("noteTitle")?.value.trim();
+    const body = document.getElementById("noteBody")?.value.trim();
+
+    if (!body) {
+      alert("Enter your notes first.");
+      return;
+    }
+
+    data.notes.unshift({
+      id: id("note"),
+      title: title || "Study note",
+      body,
+      createdAt: new Date().toISOString()
+    });
+
+    saveData();
+    document.getElementById("noteTitle").value = "";
+    document.getElementById("noteBody").value = "";
+    alert("Note saved.");
+  });
+
+  document.getElementById("clearNote")?.addEventListener("click", () => {
+    document.getElementById("noteTitle").value = "";
+    document.getElementById("noteBody").value = "";
+  });
+
+  // Save a manually written news analysis
+  document.getElementById("saveAnalysis")?.addEventListener("click", () => {
+    const title = document.getElementById("articleTitle")?.value.trim();
+
+    const analysis = {
+      id: id("analysis"),
+      title: title || "News analysis",
+      english: document.getElementById("analysisEnglish")?.value || "",
+      telugu: document.getElementById("analysisTelugu")?.value || "",
+      prelims: document.getElementById("analysisPrelims")?.value || "",
+      mains: document.getElementById("analysisMains")?.value || "",
+      createdAt: new Date().toISOString()
+    };
+
+    if (![analysis.english, analysis.telugu, analysis.prelims, analysis.mains].some(v => v.trim())) {
+      alert("Enter at least one analysis field first.");
+      return;
+    }
+
+    data.analyses.unshift(analysis);
+    data.notes.unshift({
+      id: id("note"),
+      title: analysis.title,
+      body: [
+        analysis.english,
+        analysis.telugu,
+        analysis.prelims,
+        analysis.mains
+      ].filter(Boolean).join("\n\n"),
+      createdAt: new Date().toISOString()
+    });
+
+    saveData();
+    alert("News analysis saved.");
+  });
+
+  // Add MCQ
+  document.getElementById("showAddMcq")?.addEventListener("click", () => {
+    document.getElementById("addMcqPanel")?.classList.toggle("hidden");
+  });
+
+  document.getElementById("saveMcq")?.addEventListener("click", () => {
+    const question = document.getElementById("newQuestion").value.trim();
+    const options = ["optA", "optB", "optC", "optD"].map(
+      key => document.getElementById(key).value.trim()
+    );
+
+    if (!question || options.some(v => !v)) {
+      alert("Enter the question and all four options.");
+      return;
+    }
+
+    data.mcqs.push({
+      id: id("q"),
+      exam: document.getElementById("newExam").value,
+      subject: document.getElementById("newSubject").value.trim() || "General Studies",
+      topic: document.getElementById("newTopic").value.trim() || "General",
+      question,
+      options,
+      answer: Number(document.getElementById("newAnswer").value),
+      explanation: document.getElementById("newExplanation").value.trim(),
+      telugu: document.getElementById("newTelugu").value.trim(),
+      additional: document.getElementById("newAdditional").value.trim(),
+      source: document.getElementById("newSource").value.trim(),
+      bookmarked: false
+    });
+
+    saveData();
+    alert("Question saved successfully.");
+  });
+
+  // Search and filter MCQs
+  ["mcqSearch", "mcqExam", "batchSize", "setSelect", "termSearch", "termCategory"]
+    .forEach(key => {
+      document.getElementById(key)?.addEventListener("input", () => {
+        if (key.startsWith("mcq") || key === "batchSize" || key === "setSelect") {
+          renderQuestions();
+        } else {
+          renderTerms();
+        }
+      });
+
+      document.getElementById(key)?.addEventListener("change", () => {
+        if (key.startsWith("mcq") || key === "batchSize" || key === "setSelect") {
+          renderQuestions();
+        } else {
+          renderTerms();
+        }
+      });
+    });
+
+  // Add a term
+  document.getElementById("showAddTerm")?.addEventListener("click", () => {
+    document.getElementById("addTermPanel")?.classList.toggle("hidden");
+  });
+
+  document.getElementById("saveTerm")?.addEventListener("click", () => {
+    const name = document.getElementById("termName").value.trim();
+    if (!name) {
+      alert("Enter a term name.");
+      return;
+    }
+
+    data.terms.push({
+      id: id("term"),
+      name,
+      category: document.getElementById("termNewCategory").value,
+      definition: document.getElementById("termDefinition").value.trim(),
+      telugu: document.getElementById("termTelugu").value.trim(),
+      prelims: document.getElementById("termPrelims").value.trim(),
+      source: document.getElementById("termSource").value.trim(),
+      bookmarked: false
+    });
+
+    saveData();
+    alert("Term saved.");
+  });
+
+  // Add planner task
+  document.getElementById("saveTask")?.addEventListener("click", () => {
+    const text = document.getElementById("taskText").value.trim();
+    if (!text) {
+      alert("Enter a study task.");
+      return;
+    }
+
+    data.tasks.push({
+      id: id("task"),
+      text,
+      exam: document.getElementById("taskExam").value,
+      done: false
+    });
+
+    saveData();
+    document.getElementById("taskText").value = "";
+  });
+
+  // Add exam alert
+  document.getElementById("saveAlert")?.addEventListener("click", () => {
+    const title = document.getElementById("alertTitle").value.trim();
+    if (!title) {
+      alert("Enter an alert title.");
+      return;
+    }
+
+    data.alerts.push({
+      id: id("alert"),
+      exam: document.getElementById("alertExam").value,
+      title,
+      date: document.getElementById("alertDate").value,
+      url: document.getElementById("alertUrl").value.trim()
+    });
+
+    saveData();
+    alert("Exam alert saved.");
+  });
+
+  // Export/import backup
+  document.getElementById("exportBackup")?.addEventListener("click", () => {
+    download(
+      "exam-study-studio-backup.json",
+      JSON.stringify(data, null, 2),
+      "application/json"
+    );
+  });
+
+  document.getElementById("importBackup")?.addEventListener("change", async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const imported = JSON.parse(await file.text());
+      if (!imported || !Array.isArray(imported.mcqs) || !Array.isArray(imported.terms)) {
+        throw new Error("This does not look like a valid study backup.");
+      }
+
+      if (!confirm("Import backup? This replaces the current saved study data.")) return;
+
+      data = normalizeData(imported);
+      saveData();
+      alert("Backup imported successfully.");
+    } catch (error) {
+      alert("Import failed: " + error.message);
+    }
+  });
+
+  // Search saved learning material
+  document.getElementById("teachBtn")?.addEventListener("click", () => {
+    const topic = document.getElementById("teacherTopic").value.trim().toLowerCase();
+    const result = document.getElementById("teacherResult");
+
+    if (!topic) {
+      result.textContent = "Enter a topic to search.";
+      return;
+    }
+
+    const matches = [
+      ...data.mcqs.filter(q => JSON.stringify(q).toLowerCase().includes(topic))
+        .map(q => `MCQ: ${q.question}\n${q.explanation || ""}`),
+      ...data.terms.filter(t => JSON.stringify(t).toLowerCase().includes(topic))
+        .map(t => `Term: ${t.name}\n${t.definition || ""}\n${t.telugu || ""}`),
+      ...data.notes.filter(n => JSON.stringify(n).toLowerCase().includes(topic))
+        .map(n => `Note: ${n.title}\n${n.body}`)
+    ];
+
+    result.textContent = matches.join("\n\n") || "No saved learning material matched this topic.";
+  });
+
+  // Shuffle question order
+  document.getElementById("shuffleBtn")?.addEventListener("click", () => {
+    for (let i = data.mcqs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [data.mcqs[i], data.mcqs[j]] = [data.mcqs[j], data.mcqs[i]];
+    }
+    selectedQuestionId = null;
+    saveData();
+  });
+
+  // Export questions
+  document.getElementById("exportMcqJson")?.addEventListener("click", () => {
+    download("mcqs.json", JSON.stringify(data.mcqs, null, 2), "application/json");
+  });
+
+  document.getElementById("exportMcqCsv")?.addEventListener("click", () => {
+    const quote = value => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = [
+      ["Exam", "Subject", "Topic", "Question", "Option A", "Option B", "Option C", "Option D", "Answer", "Explanation"],
+      ...data.mcqs.map(q => [
+        q.exam, q.subject, q.topic, q.question,
+        ...(q.options || []), q.options?.[q.answer] || "", q.explanation
+      ])
+    ];
+    download("mcqs.csv", rows.map(row => row.map(quote).join(",")).join("\r\n"));
+  });
+
+  document.getElementById("printMcqs")?.addEventListener("click", () => window.print());
+
+  refreshAll();
+  console.log("Exam Study Studio: functionality handlers initialized.");
+});
