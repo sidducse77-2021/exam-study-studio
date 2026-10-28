@@ -519,5 +519,9 @@ function renderDocuments() {
     });
   });
 }
+function renderAlerts() {}
 
-function renderAlerts
+document.addEventListener("DOMContentLoaded", () => {
+  bindNavigation();
+  go("dashboard");
+});
