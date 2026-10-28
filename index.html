@@ -1,377 +1,73 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#17324d">
-  <title>Exam Study Studio</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-</head>
-<body>
-  <header class="topbar">
-    <div>
-      <div class="eyebrow">PERSONAL LEARNING WORKSPACE</div>
-      <h1>Exam Study Studio</h1>
-      <p class="subtitle">UPSC · APPSC · RRB · SSC · CTET · DSC · TET</p>
-    </div>
-    <button id="installBtn" class="secondary hidden">Install app</button>
-  </header>
-
-  <div class="layout">
-    <nav class="sidebar" aria-label="Main navigation">
-      <button class="nav active" data-view="dashboard">⌂ Dashboard</button>
-      <button class="nav" data-view="teacher">▣ Study Teacher</button>
-      <button class="nav" data-view="mcqs">✓ All MCQs</button>
-      <button class="nav" data-view="documents">▤ Documents & News Analysis</button>
-      <button class="nav" data-view="terms">⌕ Terms Explorer</button>
-      <button class="nav" data-view="notes">✎ Study Notes</button>
-      <button class="nav" data-view="alerts">⚑ Exam Alerts</button>
-      <button class="nav" data-view="planner">▦ Study Planner</button>
-      <button class="nav" data-view="backup">⇅ Backup & Settings</button>
-    </nav>
-
-    <main id="mainContent">
-      <section class="view active" id="dashboard">
-        <div class="welcome">
-          <div>
-            <span class="pill">Bilingual exam workspace</span>
-            <h2>Study smarter, one topic at a time.</h2>
-            <p>Build a reusable practice bank from uploaded documents, notes, official references and your saved revision material.</p>
-          </div>
-        </div>
-
-        <div class="stats">
-          <article class="stat"><span>Saved MCQs</span><strong id="statMcqs">0</strong></article>
-          <article class="stat"><span>Study notes</span><strong id="statNotes">0</strong></article>
-          <article class="stat"><span>Terms</span><strong id="statTerms">0</strong></article>
-          <article class="stat"><span>Documents</span><strong id="statDocs">0</strong></article>
-        </div>
-
-        <div class="panel">
-          <h3>Quick start</h3>
-          <div class="quick-grid">
-            <button class="quick" data-goto="mcqs"><strong>Practice MCQs</strong><span>Browse question sets</span></button>
-            <button class="quick" data-goto="documents"><strong>Upload & analyze</strong><span>Read PDFs, paste text or notes</span></button>
-            <button class="quick" data-goto="terms"><strong>Explore terms</strong><span>Browse exam terminology</span></button>
-            <button class="quick" data-goto="backup"><strong>Backup & settings</strong><span>Export JSON backups</span></button>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h3>Study dashboard</h3>
-          <div id="dashboardSummary" class="summary-grid"></div>
-          <div class="dashboard-row">
-            <h4>Exam countdowns</h4>
-            <div id="countdownCards" class="countdown-grid"></div>
-          </div>
-        </div>
-
-        <div class="notice">
-          <strong>Important:</strong> This project is local-first and intentionally does not claim working cloud sync or Google Drive access until OAuth and provider setup is complete.
-        </div>
-      </section>
-
-      <section class="view" id="teacher">
-        <div class="section-heading">
-          <div>
-            <h2>Study Teacher</h2>
-            <p>Search saved notes, terms and question content by topic.</p>
-          </div>
-        </div>
-
-        <div class="panel">
-          <label for="teacherTopic">Enter a topic</label>
-          <input id="teacherTopic" placeholder="e.g. Fundamental Rights, inflation, monsoon">
-          <div class="row">
-            <button id="teachBtn" class="primary">Find learning material</button>
-          </div>
-          <div id="teacherResult" class="result-box">Choose a topic to search your saved terms, notes and document material.</div>
-        </div>
-      </section>
-
-      <section class="view" id="mcqs">
-        <div class="section-heading">
-          <div>
-            <h2>All MCQs</h2>
-            <p>One master collection · filtered practice · exports and revision.</p>
-          </div>
-        </div>
-
-        <div class="toolbar">
-          <input id="mcqSearch" placeholder="Search by question, topic or source">
-          <select id="mcqExam">
-            <option value="">All exams</option>
-            <option>UPSC</option>
-            <option>APPSC Group 1</option>
-            <option>APPSC Group 2</option>
-            <option>RRB</option>
-            <option>SSC</option>
-            <option>CTET</option>
-            <option>DSC</option>
-            <option>TET</option>
-          </select>
-          <select id="setSelect"><option value="0">All questions</option></select>
-          <label class="mini-field">
-            <span>Batch size</span>
-            <input id="batchSize" type="number" min="5" max="50" value="15">
-          </label>
-          <button id="shuffleBtn" class="secondary">Shuffle sets</button>
-        </div>
-
-        <div class="toolbar">
-          <button id="exportMcqJson" class="secondary">Download master JSON</button>
-          <button id="exportMcqCsv" class="secondary">Download master CSV</button>
-          <button id="printMcqs" class="secondary">Print / Save PDF</button>
-          <button id="showAddMcq" class="primary">+ Add question</button>
-        </div>
-
-        <div id="addMcqPanel" class="panel hidden">
-          <h3>Add a question</h3>
-          <div class="form-grid">
-            <label>Exam<select id="newExam">
-              <option>UPSC</option>
-              <option>APPSC Group 1</option>
-              <option>APPSC Group 2</option>
-              <option>RRB</option>
-              <option>SSC</option>
-              <option>CTET</option>
-              <option>DSC</option>
-              <option>TET</option>
-            </select></label>
-
-            <label>Subject<input id="newSubject" placeholder="Polity"></label>
-            <label>Topic<input id="newTopic" placeholder="Fundamental Rights"></label>
-            <label>Question<input id="newQuestion" placeholder="Enter the question"></label>
-            <label>Option A<input id="optA"></label>
-            <label>Option B<input id="optB"></label>
-            <label>Option C<input id="optC"></label>
-            <label>Option D<input id="optD"></label>
-            <label>Correct option<select id="newAnswer">
-              <option value="0">A</option>
-              <option value="1">B</option>
-              <option value="2">C</option>
-              <option value="3">D</option>
-            </select></label>
-            <label>Explanation (English)<textarea id="newExplanation"></textarea></label>
-            <label>వివరణ (తెలుగు)<textarea id="newTelugu"></textarea></label>
-            <label>Additional information<textarea id="newAdditional"></textarea></label>
-            <label>Source title / URL<input id="newSource" placeholder="Official source or textbook"></label>
-          </div>
-          <button id="saveMcq" class="primary">Save question</button>
-        </div>
-
-        <div class="mcq-layout">
-          <div id="questionList" class="question-list"></div>
-          <article id="questionDetail" class="question-detail panel">
-            <div class="empty-state">Select a question to view its options and explanations.</div>
-          </article>
-        </div>
-
-        <div class="pager">
-          <button id="prevQuestion" class="secondary">← Previous</button>
-          <span id="questionPosition">No question selected</span>
-          <button id="nextQuestion" class="primary">Next →</button>
-        </div>
-      </section>
-
-      <section class="view" id="documents">
-        <div class="section-heading">
-          <div>
-            <h2>Documents & News Analysis</h2>
-            <p>Upload PDFs, text, Markdown, DOCX and pasted text for analysis and question generation.</p>
-          </div>
-        </div>
-
-        <div class="panel">
-          <label for="pdfUpload">Upload PDF / text / document</label>
-          <input type="file" id="pdfUpload" accept=".pdf,.txt,.md,.docx,.png,.jpg,.jpeg">
-          <p class="muted">Text-based PDFs are processed in-browser. Scanned/image-only PDFs require OCR or a configured AI backend. Use the paste box below if extraction fails.</p>
-          <div id="pdfStatus" class="status"></div>
-
-          <label for="extractedText">Extracted / pasted article text</label>
-          <textarea id="extractedText" class="large-text" placeholder="Extracted text will appear here. You can also paste an article manually."></textarea>
-
-          <div class="row wrap">
-            <button id="saveDocument" class="primary">Save document text</button>
-            <button id="makeNotes" class="secondary">Create notes from text</button>
-            <button id="makeMcqs" class="secondary">Generate AI MCQs</button>
-            <button id="downloadText" class="secondary">Download text</button>
-          </div>
-        </div>
-
-        <div class="panel">
-          <h3>News analysis workspace</h3>
-          <p class="muted">This section supports uploaded newspaper PDFs and pasted articles, but will not claim live crawling unless a working source is configured.</p>
-
-          <label for="articleTitle">Headline / topic</label>
-          <input id="articleTitle" placeholder="Enter article headline">
-
-          <div class="analysis-grid">
-            <label>Summary (English)<textarea id="analysisEnglish" placeholder="Summarize the article in English."></textarea></label>
-            <label>సారాంశం (తెలుగు)<textarea id="analysisTelugu" placeholder="వార్తను తెలుగులో సంక్షిప్తంగా వ్రాయండి."></textarea></label>
-            <label>Prelims facts<textarea id="analysisPrelims" placeholder="Names, dates, schemes, institutions, data..."></textarea></label>
-            <label>Mains relevance<textarea id="analysisMains" placeholder="Background, context, arguments and examples..."></textarea></label>
-          </div>
-
-          <button id="saveAnalysis" class="primary">Save news analysis</button>
-        </div>
-
-        <div class="panel">
-          <h3>Saved documents and analyses</h3>
-          <div id="documentList"></div>
-        </div>
-      </section>
-
-      <section class="view" id="terms">
-        <div class="section-heading">
-          <div>
-            <h2>Terms Explorer</h2>
-            <p>Names, schemes, years, experiments, places, rivers, concepts and more.</p>
-          </div>
-        </div>
-
-        <div class="toolbar">
-          <input id="termSearch" placeholder="Search terms in English or Telugu">
-          <select id="termCategory">
-            <option value="">All categories</option>
-            <option>Polity</option>
-            <option>Economy</option>
-            <option>Geography</option>
-            <option>Environment</option>
-            <option>Science & Technology</option>
-            <option>History & Culture</option>
-            <option>International Relations</option>
-            <option>Andhra Pradesh</option>
-          </select>
-          <button id="showAddTerm" class="secondary">+ Add term</button>
-        </div>
-
-        <div id="addTermPanel" class="panel hidden">
-          <div class="form-grid">
-            <label>Term name<input id="termName"></label>
-            <label>Category<select id="termNewCategory">
-              <option>Polity</option>
-              <option>Economy</option>
-              <option>Geography</option>
-              <option>Environment</option>
-              <option>Science & Technology</option>
-              <option>History & Culture</option>
-              <option>International Relations</option>
-              <option>Andhra Pradesh</option>
-            </select></label>
-            <label>Definition / English<textarea id="termDefinition"></textarea></label>
-            <label>తెలుగు వివరణ<textarea id="termTelugu"></textarea></label>
-            <label>Prelims importance<textarea id="termPrelims"></textarea></label>
-            <label>Source title / URL<input id="termSource"></label>
-          </div>
-          <button id="saveTerm" class="primary">Save term</button>
-        </div>
-
-        <div id="termList" class="cards-grid"></div>
-      </section>
-
-      <section class="view" id="notes">
-        <div class="section-heading">
-          <div>
-            <h2>Study Notes</h2>
-            <p>Save and revise your own notes in Telugu or English.</p>
-          </div>
-        </div>
-
-        <div class="panel">
-          <label for="noteTitle">Title</label>
-          <input id="noteTitle" placeholder="Topic / article title">
-          <label for="noteBody">Notes</label>
-          <textarea id="noteBody" class="large-text" placeholder="Write notes in Telugu or English..."></textarea>
-          <div class="row wrap">
-            <button id="saveNote" class="primary">Save note</button>
-            <button id="clearNote" class="secondary">Clear</button>
-          </div>
-        </div>
-
-        <div id="noteList" class="cards-grid"></div>
-      </section>
-
-      <section class="view" id="alerts">
-        <div class="section-heading">
-          <div>
-            <h2>Exam Alerts</h2>
-            <p>Save official links and deadlines. Verify all dates and authorities before you trust them.</p>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="form-grid">
-            <label>Exam<select id="alertExam">
-              <option>UPSC</option>
-              <option>APPSC</option>
-              <option>RRB</option>
-              <option>SSC</option>
-              <option>CTET</option>
-              <option>DSC</option>
-              <option>TET</option>
-            </select></label>
-            <label>Notification / event<input id="alertTitle" placeholder="Notification title"></label>
-            <label>Deadline / exam date<input id="alertDate" type="date"></label>
-            <label>Official URL<input id="alertUrl" placeholder="https://..."></label>
-          </div>
-          <button id="saveAlert" class="primary">Save alert</button>
-        </div>
-
-        <div id="alertList" class="cards-grid"></div>
-        <div class="notice">This version stores reminders you add manually. It does not automatically monitor every exam website in the background.</div>
-      </section>
-
-      <section class="view" id="planner">
-        <div class="section-heading">
-          <div>
-            <h2>Study Planner</h2>
-            <p>Create daily tasks and mark progress.</p>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="form-grid">
-            <label>Task<input id="taskText" placeholder="Revise Fundamental Rights"></label>
-            <label>Exam<select id="taskExam">
-              <option>UPSC</option>
-              <option>APPSC Group 1</option>
-              <option>APPSC Group 2</option>
-              <option>RRB</option>
-              <option>SSC</option>
-              <option>CTET</option>
-              <option>DSC</option>
-              <option>TET</option>
-            </select></label>
-          </div>
-          <button id="saveTask" class="primary">Add task</button>
-        </div>
-
-        <div id="taskList" class="cards-grid"></div>
-      </section>
-
-      <section class="view" id="backup">
-        <div class="section-heading">
-          <div>
-            <h2>Backup & Settings</h2>
-            <p>Export your local data regularly. Browser storage does not automatically sync between devices.</p>
-          </div>
-        </div>
-
-               <div class="panel">
-          <h3>Portable backup</h3>
-          <p>Export your study data regularly to keep a safe copy.</p>
-          <button id="exportBackup" class="primary">Export Backup</button>
-          <label for="importBackup">Import backup</label>
-          <input id="importBackup" type="file" accept=".json,application/json">
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <script src="app.js"></script>
-</body>
-</html>
+--- a/index.html
++++ b/index.html
+@@
+        <button class="nav" data-view="teacher">▣ Study Teacher</button>
+        <button class="nav" data-view="mcqs">✓ All MCQs</button>
+        <button class="nav" data-view="documents">▤ Documents & News Analysis</button>
++       <button class="nav" data-view="news">◔ Daily News</button>
+        <button class="nav" data-view="terms">⌕ Terms Explorer</button>
+        <button class="nav" data-view="notes">✎ Study Notes</button>
+        <button class="nav" data-view="alerts">⚑ Exam Alerts</button>
+@@
+       <section class="view" id="documents">
+@@
+       </section>
++
++      <section class="view" id="news">
++        <div class="section-heading">
++          <div>
++            <h2>Daily News & Current Affairs</h2>
++            <p>Reliable current affairs, article summaries, and exam-linked updates.</p>
++          </div>
++        </div>
++
++        <div class="panel">
++          <div class="form-grid">
++            <label>Section
++              <select id="newsSection">
++                <option>Andhra Pradesh</option>
++                <option>National</option>
++                <option>International Relations</option>
++                <option>Economy</option>
++                <option>Polity and Governance</option>
++                <option>Science and Technology</option>
++                <option>Environment</option>
++                <option>History and Culture</option>
++                <option>Important reports and indices</option>
++              </select>
++            </label>
++            <label>Title<input id="newsTitle" placeholder="Article title"></label>
++            <label>Source<input id="newsSource" placeholder="The Hindu / PIB / Official department"></label>
++            <label>Publication date<input id="newsDate" type="date"></label>
++            <label>URL<input id="newsUrl" placeholder="https://..."></label>
++            <label>Summary<textarea id="newsSummary" placeholder="Short summary with exam relevance"></textarea></label>
++          </div>
++          <div class="row">
++            <button id="saveNewsItem" class="primary">Save article</button>
++          </div>
++        </div>
++
++        <div id="dailyNewsList" class="cards-grid"></div>
++      </section>
+ 
+       <section class="view" id="terms">
+         <div class="section-heading">
+           <div>
+@@
+       </section>
+     </main>
+   </div>
++
++  <div id="conceptModal" class="concept-modal" aria-hidden="true">
++    <div class="concept-modal-backdrop" data-close-concept-modal="true"></div>
++    <div class="concept-modal-panel">
++      <div class="concept-modal-header">
++        <button class="secondary" data-close-concept-modal="true">Close</button>
++      </div>
++      <div id="conceptModalBody"></div>
++    </div>
++  </div>
+ 
+   <script src="app.js"></script>
+ </body>
+ </html>
