@@ -1,15 +1,11 @@
 export async function onRequestGet(context) {
   const clientId = context.env.GOOGLE_CLIENT_ID;
-  const redirectUri = context.env.GOOGLE_REDIRECT_URI || "http://localhost:8000/drive/oauth/callback";
+  const clientSecret = context.env.GOOGLE_CLIENT_SECRET;
+  const redirectUri = context.env.GOOGLE_REDIRECT_URI || `${new URL(context.request.url).origin}/api/drive-callback`;
 
-  if (!clientId || !context.env.GOOGLE_CLIENT_SECRET) {
-    return new Response(JSON.stringify({
-      error: "Google Drive OAuth is not configured for this deployment."
-    }), {
-      status: 500,
-      headers: {
-        "Content-Type": "application/json; charset=utf-8"
-      }
+  if (!clientId || !clientSecret) {
+    return new Response(JSON.stringify({ error: "Google Drive OAuth is not configured. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI to Cloudflare Pages production secrets." }), {
+      status: 503, headers: { "Content-Type": "application/json; charset=utf-8" }
     });
   }
 
@@ -17,10 +13,9 @@ export async function onRequestGet(context) {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "https://www.googleapis.com/auth/drive.file",
+    scope: "https://www.googleapis.com/auth/drive.readonly",
     access_type: "offline",
     prompt: "consent"
   });
-
-  return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  return Response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`, 302);
 }
