@@ -1,102 +1,99 @@
-const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8" };
-
-function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS });
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function callGemini(context, { prompt, image }) {
-  const apiKey = context.env.GEMINI_API_KEY;
-  if (!apiKey) return json({ error: "GEMINI_API_KEY is missing. Add it as a Cloudflare Pages Secret and redeploy." }, 500);
-
-  const model = "gemini-2.5-flash";
-  const parts = [];
-  if (prompt) parts.push({ text: prompt });
-  if (image) parts.push({ inline_data: { mime_type: image.mimeType, data: image.base64 } });
-  if (!parts.length) return json({ error: "Please provide text or an image to process." }, 400);
-
-  const requestBody = {
-    contents: [{ parts }],
-    generationConfig: {
-      temperature: image ? 0.1 : 0.2,
-      maxOutputTokens: image ? 6000 : 5000,
-      ...(image ? {} : { responseMimeType: "application/json" })
-    }
+export async function onRequestPost({ request, env }) {
+  const cors = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
   };
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  let lastMessage = "Gemini request failed.";
-  let lastStatus = 502;
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    let response;
-    let payload;
-    try {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify(requestBody)
-      });
-      payload = await response.json().catch(() => ({}));
-    } catch {
-      lastMessage = "Could not reach Gemini. Check your connection and try again.";
-      lastStatus = 502;
-      if (attempt < 3) { await delay(400 * attempt); continue; }
-      break;
-    }
-
-    if (response.ok) {
-      const result = payload.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("\n").trim();
-      if (!result) return json({ error: "Gemini returned no text. Try a smaller document or a clearer image." }, 502);
-      return json({ result });
-    }
-
-    lastStatus = response.status;
-    lastMessage = payload.error?.message || `Gemini API request failed (HTTP ${response.status}).`;
-    const retryable = [408, 429, 500, 502, 503, 504].includes(response.status);
-    if (!retryable || attempt === 3) break;
-    // Small bounded backoff: this helps transient throttling, but cannot bypass quota limits.
-    await delay(500 * attempt + Math.floor(Math.random() * 250));
-  }
-
-  if (lastStatus === 429) {
-    lastMessage += " Wait a little before retrying. Repeated requests cannot bypass your Gemini project quota or rate limit.";
-  }
-  return json({ error: lastMessage }, lastStatus || 502);
-}
-
-export async function onRequestPost(context) {
+  const reply = (body, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: cors });
+  if (!env.GEMINI_API_KEY)
+    return reply(
+      {
+        error:
+          "GEMINI_API_KEY secret is missing from Cloudflare Pages runtime settings.",
+      },
+      503
+    );
+  let body;
   try {
-    const contentType = context.request.headers.get("content-type") || "";
-    if (contentType.includes("multipart/form-data")) {
-      const form = await context.request.formData();
-      const kind = String(form.get("kind") || "");
-      const file = form.get("file");
-      if (!(file instanceof File)) return json({ error: "No image file was received." }, 400);
-      if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type)) {
-        return json({ error: "OCR currently accepts PNG, JPG/JPEG, WEBP or GIF images. For scanned PDFs, export pages as images or use a text-based PDF." }, 415);
+    body = await request.json();
+  } catch {
+    return reply({ error: "Request body must be valid JSON." }, 400);
+  }
+  const action = String(body.action || "");
+  const text = String(body.text || "").trim();
+  if (!text) return reply({ error: "Document text is empty." }, 400);
+  if (!["notes", "mcqs"].includes(action))
+    return reply({ error: "Unsupported action." }, 400);
+  // Keep requests within practical model limits; never silently claim the full document was processed.
+  const sourceText = text.slice(0, 60000);
+  const title = String(body.title || "Study document").slice(0, 200);
+  const prompt =
+    action === "notes"
+      ? `You are an exam-preparation teacher. Use ONLY the source text below. Create useful concise bilingual English + Telugu study notes for APPSC Group 1/UPSC. Preserve names, dates, places, schemes, definitions, numbers and source terminology. Organize with headings, key facts, chronology where relevant, prelims facts, mains relevance, and quick revision points. Do not invent facts. If information is absent, omit it. Return plain Markdown, not JSON. Document: ${title}\n\nSOURCE TEXT:\n${sourceText}`
+      : `You are an exam MCQ writer for APPSC Group 1 and UPSC. Use ONLY the source text below. Generate 10 distinct, source-grounded MCQs with four options each, correct answer index 0-3, English explanation, Telugu explanation, subject, topic, difficulty, and source. Also extract up to 20 important terms/entities (people, schemes, years, experiments, cities/places, rivers, institutions, political/economic/geographical/science terms, events) with brief English definition and Telugu meaning when supported. Do not invent unsupported facts. Return ONLY valid JSON with schema: {"mcqs":[{"question":"...","options":["...","...","...","..."],"answer":0,"explanation":"...","telugu":"...","subject":"...","topic":"...","difficulty":"Intermediate","source":"${title}","tags":[]}],"terms":[{"name":"...","category":"...","definition":"...","telugu":"...","source":"${title}"}]}. Ensure answer is an integer 0-3.\n\nSOURCE TEXT:\n${sourceText}`;
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": env.GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig:
+            action === "mcqs"
+              ? { responseMimeType: "application/json", temperature: 0.2 }
+              : { temperature: 0.3 },
+        }),
       }
-      if (file.size > 7 * 1024 * 1024) return json({ error: "Image is larger than 7 MB. Please resize it and try again." }, 413);
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      let binary = "";
-      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      const base64 = btoa(binary);
-      const prompt = kind === "ocr"
-        ? "Read all legible text in this image faithfully. Preserve names, dates, numbers, tables, headings and paragraphs. Do not summarize or invent missing text. Return extracted text only."
-        : String(form.get("prompt") || "Describe this image for exam preparation.");
-      return await callGemini(context, { prompt, image: { mimeType: file.type, base64 } });
+    );
+    const data = await res.json();
+    if (!res.ok)
+      return reply(
+        {
+          error:
+            data?.error?.message ||
+            `Gemini API returned ${res.status}. Check API key and Gemini API access.`,
+        },
+        502
+      );
+    const output = data?.candidates?.[0]?.content?.parts
+      ?.map((p) => p.text || "")
+      .join("\n")
+      .trim();
+    if (!output)
+      return reply(
+        {
+          error:
+            "Gemini returned no text. Try again or use a shorter document.",
+        },
+        502
+      );
+    if (action === "notes") return reply({ notes: output });
+    let parsed;
+    try {
+      parsed = JSON.parse(
+        output.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")
+      );
+    } catch {
+      return reply(
+        { error: "Gemini response was not valid JSON. Please try again." },
+        502
+      );
     }
-
-    if (!contentType.includes("application/json")) return json({ error: "Request must be JSON or an image upload." }, 415);
-    const body = await context.request.json().catch(() => ({}));
-    const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "";
-    if (!prompt) return json({ error: "Please provide a prompt." }, 400);
-    if (prompt.length > 32000) return json({ error: "Input is too long. Split the material into smaller sections." }, 413);
-    return await callGemini(context, { prompt });
+    return reply({
+      mcqs: Array.isArray(parsed.mcqs) ? parsed.mcqs : [],
+      terms: Array.isArray(parsed.terms) ? parsed.terms : [],
+    });
   } catch (error) {
-    console.error("Generate API error", error);
-    return json({ error: "The request could not be processed. Check the file/input and try again." }, 500);
+    return reply(
+      {
+        error:
+          "Could not connect to Gemini: " + (error?.message || "network error"),
+      },
+      502
+    );
   }
 }
