@@ -144,7 +144,7 @@ ${sourceText}`;
 
   // Keep retries limited: long retry chains can themselves trigger gateway 524s.
   // Do not use Gemini 2.5 models as fallbacks: this API key reports that
-  // gemini-2.5-flash is unavailable to new users. Use currently listed newer models.
+  // gemini-3.8-flash is unavailable to new users. Use currently listed newer models.
   const models = [
     "gemini-3.8-flash",
     "gemini-3.6-flash",
