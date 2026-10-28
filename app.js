@@ -189,7 +189,7 @@ function saveData() {
 }
 
 function id(prefix = "id") {
-  return ${prefix}_${Date.now().toString(36)}_${Math.random() .toString(36) .slice(2, 8)};
+  return `${prefix}_${Date.now().toString(36)}_${Math.random() .toString(36) .slice(2, 8)}`;
 }
 
 function esc(value = "") {
@@ -353,7 +353,7 @@ function renderQuestions() {
     sets
       .map(
         (_, index) =>
-          <option value=\"${index + 1}\">Set ${index + 1} (${ (sets[index] || []).length } questions)</option>
+          `<option value=\"${index + 1}\">Set ${index + 1} (${ (sets[index] || []).length } questions)</option>`
       )
       .join("");
   if ([...setSelect.options].some((option) => option.value === currentValue)) {
@@ -418,7 +418,7 @@ function renderQuestionDetail(question, list) {
   if (!detail || !questionPosition) return;
 
   const position = list.findIndex((item) => item.id === question.id);
-  questionPosition.textContent = Question ${position + 1} of ${list.length};
+  questionPosition.textContent = `Question ${position + 1} of ${list.length}`;
 
   if (!question.options || !question.options.length) {
     detail.innerHTML =
@@ -431,11 +431,11 @@ function renderQuestionDetail(question, list) {
       const isCorrect = index === Number(question.answer ?? 0);
       const correctClass =
         data.settings.showAnswers && isCorrect ? "correct-answer" : "";
-      return ` <label class="mcq-option ${correctClass}"> <input type="radio" name="answer" value="${index}" ${ data.settings.showAnswers && isCorrect ? "checked" : "" }> <span>${esc( option || Option ${String.fromCharCode(65 + index)} )}</span> </label> `;
+      return ` <label class="mcq-option ${correctClass}"> <input type="radio" name="answer" value="${index}" ${ data.settings.showAnswers && isCorrect ? "checked" : "" }> <span>${esc( option || `Option ${String.fromCharCode(65 + index)}` )}</span> </label> `;
     })
     .join("");
 
-  detail.innerHTML = ` <div class="pill">${esc(question.exam || "Practice")} • ${esc( question.subject || "General" )} • ${esc(question.topic || "General")}</div> <h2>${esc(question.question || "Untitled question")}</h2> <div class="mcq-choices">${optionsHtml}</div> <div class="row wrap"> <button id="checkAnswer" class="primary">Check answer</button> <button id="bookmarkQuestion" class="secondary">${ question.bookmarked ? "Bookmarked" : "Bookmark" }</button> <button id="deleteQuestion" class="secondary danger">Delete</button> </div> ${ data.settings.showAnswers ? <div class="result-box"><strong>Correct answer:</strong> ${esc( (question.options || [])[Number(question.answer || 0)] || "Not set" )}</div> : "" } <div class="result-box"> <h4>Explanation</h4> ${ question.explanation ? <div class="explanation">${esc(question.explanation)}</div> : '<div class="muted">No explanation recorded.</div>' } ${ question.telugu ? <div class=\"explanation telugu\">${esc(question.telugu)}</div> : "" } ${ question.source ? <div class=\"meta-row\"><strong>Source:</strong> ${esc( question.source )}</div> : "" } </div> `;
+  detail.innerHTML = ` <div class="pill">${esc(question.exam || "Practice")} • ${esc( question.subject || "General" )} • ${esc(question.topic || "General")}</div> <h2>${esc(question.question || "Untitled question")}</h2> <div class="mcq-choices">${optionsHtml}</div> <div class="row wrap"> <button id="checkAnswer" class="primary">Check answer</button> <button id="bookmarkQuestion" class="secondary">${ question.bookmarked ? "Bookmarked" : "Bookmark" }</button> <button id="deleteQuestion" class="secondary danger">Delete</button> </div> ${ data.settings.showAnswers ? `<div class="result-box"><strong>Correct answer:</strong> ${esc( (question.options || [])[Number(question.answer || 0)] || "Not set" )}</div>` : "" } <div class="result-box"> <h4>Explanation</h4> ${ question.explanation ? `<div class="explanation">${esc(question.explanation)}</div>` : '<div class="muted">No explanation recorded.</div>' } ${ question.telugu ? `<div class=\"explanation telugu\">${esc(question.telugu)}</div>` : "" } ${ question.source ? `<div class=\"meta-row\"><strong>Source:</strong> ${esc( question.source )}</div>` : "" } </div> `;
 
   document.getElementById("checkAnswer")?.addEventListener("click", () => {
     const checked = document.querySelector('input[name="answer"]:checked');
@@ -457,7 +457,7 @@ function renderQuestionDetail(question, list) {
     alert(
       isCorrect
         ? "Correct! Good work."
-        : Incorrect. The correct answer is ${ question.options[correctIndex] || "Option " + (correctIndex + 1) }.
+        : `Incorrect. The correct answer is ${ question.options[correctIndex] || "Option " + (correctIndex + 1) }.`
     );
   });
 
@@ -548,7 +548,7 @@ function renderDocuments() {
   list.innerHTML = data.documents.length
     ? data.documents
         .map(
-          (documentItem) => ` <article class="note-card"> <h3>${esc(documentItem.name || "Untitled document")}</h3> <p class="muted">${esc(documentItem.type || "Document")} • ${ documentItem.pages ? ${documentItem.pages} pages : "No page data" } • ${formatDate(documentItem.createdAt)}</p> <div class="row wrap"> <button class="secondary" data-document-preview="${esc( documentItem.id )}">Preview</button> </div> </article> `
+          (documentItem) => ` <article class="note-card"> <h3>${esc(documentItem.name || "Untitled document")}</h3> <p class="muted">${esc(documentItem.type || "Document")} • ${ documentItem.pages ? `${documentItem.pages} pages` : "No page data" } • ${formatDate(documentItem.createdAt)}</p> <div class="row wrap"> <button class="secondary" data-document-preview="${esc( documentItem.id )}">Preview</button> </div> </article> `
         )
         .join("")
     : '<div class="empty-state">No documents are saved yet. Add a PDF or pasted text to start.</div>';
@@ -580,7 +580,7 @@ function renderAlerts() {
   el.innerHTML =
     data.alerts
       .map(
-        (a, i) => ` <article class="panel"> <h3>${esc(a.title)}</h3> <p>${esc(a.exam)} | ${esc(a.date || "No date")}</p> ${ a.url ? <a href="${esc( a.url )}" target="_blank" rel="noopener">Open official link</a> : "" } <button class="secondary" data-delete-alert="${i}">Delete</button> </article> `
+        (a, i) => ` <article class="panel"> <h3>${esc(a.title)}</h3> <p>${esc(a.exam)} | ${esc(a.date || "No date")}</p> ${ a.url ? `<a href="${esc( a.url )}" target="_blank" rel="noopener">Open official link</a>` : "" } <button class="secondary" data-delete-alert="${i}">Delete</button> </article> `
       )
       .join("") || "<p>No alerts saved.</p>";
 
@@ -668,7 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const pages = [];
 
           for (let p = 1; p <= pdf.numPages; p++) {
-            setPdfStatus(Extracting PDF text: page ${p} of ${pdf.numPages});
+            setPdfStatus(`Extracting PDF text: page ${p} of ${pdf.numPages}`);
             const page = await pdf.getPage(p);
             const content = await page.getTextContent();
             pages.push(content.items.map((item) => item.str || "").join(" "));
@@ -699,7 +699,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         setPdfStatus(
-          Extraction complete. ${output.value.length} characters extracted.
+          `Extraction complete. ${output.value.length} characters extracted.`
         );
       } catch (error) {
         console.error("Document extraction failed:", error);
@@ -736,7 +736,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // AI-generated notes, MCQs and terms via secure Cloudflare Pages Function
   async function requestStudyAI(action, text) {
     const status = document.getElementById("pdfStatus");
-    if (status) status.textContent = Generating ${action} with Gemini AI...;
+    if (status) status.textContent = `Generating ${action} with Gemini AI...`;
     const response = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -753,7 +753,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const payload = await response.json().catch(() => ({}));
     if (!response.ok)
       throw new Error(
-        payload.error || AI request failed (${response.status})
+        payload.error || `AI request failed (${response.status})`
       );
     return payload;
   }
@@ -853,10 +853,10 @@ document.addEventListener("DOMContentLoaded", () => {
       selectedQuestionId = fresh[0]?.id || selectedQuestionId;
       saveData();
       setPdfStatus(
-        Generated ${fresh.length} new MCQs and added ${terms.length} extracted terms (duplicates skipped).
+        `Generated ${fresh.length} new MCQs and added ${terms.length} extracted terms (duplicates skipped).`
       );
       alert(
-        AI generation complete. Added ${fresh.length} new MCQs. Open All MCQs to practice and Terms Explorer to review extracted terms.
+        `AI generation complete. Added ${fresh.length} new MCQs. Open All MCQs to practice and Terms Explorer to review extracted terms.`
       );
       go("questions");
     } catch (error) {
@@ -1133,15 +1133,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const matches = [
       ...data.mcqs
         .filter((q) => JSON.stringify(q).toLowerCase().includes(topic))
-        .map((q) => MCQ: ${q.question}\n${q.explanation || ""}),
+        .map((q) => `MCQ: ${q.question}\n${q.explanation || ""}`),
       ...data.terms
         .filter((t) => JSON.stringify(t).toLowerCase().includes(topic))
         .map(
-          (t) => Term: ${t.name}\n${t.definition || ""}\n${t.telugu || ""}
+          (t) => `Term: ${t.name}\n${t.definition || ""}\n${t.telugu || ""}`
         ),
       ...data.notes
         .filter((n) => JSON.stringify(n).toLowerCase().includes(topic))
-        .map((n) => Note: ${n.title}\n${n.body}),
+        .map((n) => `Note: ${n.title}\n${n.body}`),
     ];
 
     result.textContent =
@@ -1168,4 +1168,4 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.getElementById("exportMcqCsv")?.addEventListener("click", () => {
-    const quote = (value) => "${String(value ?? "").replace(/"/g, '""')}"; const rows = [ [ "Exam", "Subject", "Topic", "Question", "Option A", "Option B", "Option C", "Option D", "Answer", "Explanation", ], ...data.mcqs.map((q) => [ q.exam, q.subject, q.topic, q.question, ...(q.options || []), q.options?.[q.answer] || "", q.explanation, ]), ]; download( "mcqs.csv", rows.map((row) => row.map(quote).join(",")).join("\r\n") ); }); document .getElementById("printMcqs") ?.addEventListener("click", () => window.print()); refreshAll(); console.log("Exam Study Studio: functionality handlers initialized."); });
+    const quote = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`; const rows = [ [ "Exam", "Subject", "Topic", "Question", "Option A", "Option B", "Option C", "Option D", "Answer", "Explanation", ], ...data.mcqs.map((q) => [ q.exam, q.subject, q.topic, q.question, ...(q.options || []), q.options?.[q.answer] || "", q.explanation, ]), ]; download( "mcqs.csv", rows.map((row) => row.map(quote).join(",")).join("\r\n") ); }); document .getElementById("printMcqs") ?.addEventListener("click", () => window.print()); refreshAll(); console.log("Exam Study Studio: functionality handlers initialized."); });
